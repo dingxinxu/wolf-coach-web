@@ -3,7 +3,7 @@
 > 把 wolf-game-coach 技能封装为 H5 应用，
 > 让你在线下对局时随时拿出手机访问，实时获得教练级建议。
 
-[![Deploy](https://github.com/<your-user>/<your-repo>/actions/workflows/deploy.yml/badge.svg)](./.github/workflows/deploy.yml)
+[![Deploy](https://github.com/dingxinxu/wolf-coach-web/actions/workflows/deploy.yml/badge.svg)](./.github/workflows/deploy.yml)
 
 ## ✨ 特性
 
