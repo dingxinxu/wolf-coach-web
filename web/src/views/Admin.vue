@@ -9,14 +9,16 @@
  *   - LLM/STT 共享池配置（GET/PUT /admin/api/config, /admin/api/stt）
  *   - 访问码管理（POST/GET/DELETE /admin/api/codes）
  */
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref } from 'vue';
 import { workerBase } from '../stores/settings.js';
 import { access, setAdminKey, clearAdminKey } from '../stores/access.js';
 
 const BASE = workerBase();
 const adminKeyInput = ref('');
 const loginError = ref('');
-const isAdmin = computed(() => !!access.adminKey);
+function isAdmin() {
+  return !!access.adminKey;
+}
 
 function login() {
   setAdminKey(adminKeyInput.value.trim());
