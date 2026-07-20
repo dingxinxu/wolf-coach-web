@@ -5,6 +5,9 @@
 
 [![Deploy](https://github.com/dingxinxu/wolf-coach-web/actions/workflows/deploy.yml/badge.svg)](./.github/workflows/deploy.yml)
 
+> 🌐 **线上访问**：<https://dingxinxu.github.io/wolf-coach-web/>
+> 📦 **源码仓库**：<https://github.com/dingxinxu/wolf-coach-web>
+
 ## ✨ 特性
 
 - **极简卡片选择**：板子、身份、座位、票型全部点击选择，几乎不用打字。
@@ -59,27 +62,29 @@ wolf-coach-web/                # 本仓库（monorepo）
 ## 🚀 快速开始（本地开发）
 
 ```bash
-# 1. 安装
+# 1. 克隆
+git clone https://github.com/dingxinxu/wolf-coach-web.git
 cd wolf-coach-web
+
+# 2. 安装依赖
 pnpm install
 
-# 2. 同步技能文档（从 skill-source/ 拷贝到 web/worker）
+# 3. 同步技能文档（从 skill-source/ 拷贝到 web/worker）
 node scripts/sync-skill.js
 node scripts/inline-skill.js
 
-# 3. 配置 Worker Secret（仅当你想用兜底 Key）
-cd worker
-cp .dev.vars.example .dev.vars
+# 4. 配置 Worker Secret（仅当你想用兜底 Key）
+cp worker/.dev.vars.example worker/.dev.vars
 # 编辑 .dev.vars 填入 DEFAULT_LLM_API_KEY=sk-xxx
 
-# 4. 启动
+# 5. 启动
 # 终端 A：Worker
 pnpm dev:worker    # 监听 http://localhost:8787
 # 终端 B：前端
-pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api → 8787
+pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api -> 8787
 ```
 
-打开 http://localhost:5173，进【设置】填入你自己的 API Key（推荐 DeepSeek），
+打开 http://localhost:5173/wolf-coach-web/，进【设置】填入你自己的 API Key（推荐 DeepSeek），
 回到【对局】开始配置本局。
 
 ## 📦 部署
@@ -89,9 +94,10 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api → 8787
 1. Fork 或推送到你的 GitHub 仓库。
 2. 仓库 Settings → Pages → Source：**GitHub Actions**。
 3. push 到 main 自动部署。
-4. 访问地址：`https://<your-user>.github.io/<your-repo>/`
+4. 访问地址：`https://dingxinxu.github.io/wolf-coach-web/`
 
-> ⚠️ 注意修改 `web/vite.config.js` 中的 `GH_PAGES_BASE`，与你的仓库名对应。
+> 仓库名默认与 `web/vite.config.js` 中的 `GH_PAGES_BASE = '/wolf-coach-web/'` 匹配。
+> 如改仓库名需同步修改 base path。
 
 ### Worker → Cloudflare Workers
 
@@ -159,6 +165,27 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api → 8787
 ### 后续（暂未规划）
 
 - 暂无。TTS 经评估不做（对制胜价值有限）。
+
+## 🧭 项目状态
+
+- **当前阶段**：MVP 完整可用 + UI 视觉打磨完成
+- **线上访问**：<https://dingxinxu.github.io/wolf-coach-web/>（前端，需自备 LLM Key）
+- **Worker 部署**：可选，未上线（如需共享 Key 池模式才需部署）
+- **最新 commits**：
+  - `ui: 视觉与移动端体验优化`
+  - `docs: README 替换真实 GitHub 用户名 dingxinxu`
+  - `feat: 狼人杀制胜教练 H5 MVP`
+- **下一步候选方向**（如需继续开发可参考）：
+  - 实测线下对局体验，根据反馈调整卡片密度与交互节奏
+  - 添加「快速重开」（保留玩家档案库 + 板子配置，仅清空当前局）
+  - 给玩家档案库加「上次对局」时间戳，方便识别生疏熟人
+  - 把 Worker 部署到 Cloudflare，启用共享 Key 池模式
+
+## 🤝 贡献
+
+欢迎提 Issue / PR。本仓库技能源 `skill-source/` 来自 wolf-game-coach 技能，
+如需修改规则/策略，请直接编辑 `skill-source/SKILL.md` 与 `references/*.md`，
+然后运行 `node scripts/sync-skill.js && node scripts/inline-skill.js` 同步。
 
 ## 📄 许可
 
