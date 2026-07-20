@@ -8,6 +8,7 @@
  * MVP 不暴露"Worker 兜底"模式给用户选——它是隐式兜底。
  */
 import { reactive, watch } from 'vue';
+import { isAuthorized } from './access.js';
 
 const STORAGE_KEY = 'wolf-coach-settings-v1';
 
@@ -56,15 +57,19 @@ watch(
   { deep: true }
 );
 
-/** 是否已经可以发请求（admin-pool 永远可以；user 模式必须有 apiKey） */
+/**
+ * 是否已经可以发请求。
+ * - admin-pool 模式：需持有效访问码（isAuthorized）
+ * - user 模式：必须有 apiKey
+ */
 export function isLLMReady() {
-  if (settings.keyMode === 'admin-pool') return true;
+  if (settings.keyMode === 'admin-pool') return isAuthorized();
   return settings.keyMode === 'user' && settings.userLLM.apiKey.trim().length > 0;
 }
 
-/** STT 是否就绪 */
+/** STT 是否就绪（同 LLM 逻辑） */
 export function isSTTReady() {
-  if (settings.sttKeyMode === 'admin-pool') return true;
+  if (settings.sttKeyMode === 'admin-pool') return isAuthorized();
   return settings.sttKeyMode === 'user' && settings.userSTT.apiKey.trim().length > 0;
 }
 
@@ -88,7 +93,7 @@ export function buildSTTForRequest() {
   return null;
 }
 
-/** Worker 基础 URL：settings.workerUrl 为空时用相对路径（同 origin / proxy） */
+/** Worker 基础 URL 优先级：settings.workerUrl -> 构建时 VITE_WORKER_URL -> '' (同 origin) */
 export function workerBase() {
-  return settings.workerUrl?.trim() || '';
+  return settings.workerUrl?.trim() || import.meta.env.VITE_WORKER_URL || '';
 }

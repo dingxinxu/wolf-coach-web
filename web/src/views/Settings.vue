@@ -7,6 +7,7 @@
  */
 import { ref } from 'vue';
 import { settings, isLLMReady, isSTTReady } from '../stores/settings.js';
+import { isAuthorized } from '../stores/access.js';
 import { roster } from '../stores/players-roster.js';
 
 function exportRoster() {
@@ -114,11 +115,12 @@ function applyPreset(p) {
         <button
           :class="settings.keyMode === 'admin-pool' ? 'chip-on' : 'chip-off'"
           class="!rounded-lg !py-3 flex flex-col items-start"
-          @click="settings.keyMode = 'admin-pool'"
+          :disabled="!isAuthorized()"
+          @click="isAuthorized() && (settings.keyMode = 'admin-pool')"
         >
           <div class="font-bold">🏛 管理员共享</div>
           <div class="text-xs opacity-80 mt-1 text-left">
-            无感使用、由部署者付费
+            {{ isAuthorized() ? '无感使用、由部署者付费' : '需访问码（顶部输入）' }}
           </div>
         </button>
       </div>
@@ -232,11 +234,12 @@ function applyPreset(p) {
         <button
           :class="settings.sttKeyMode === 'admin-pool' ? 'chip-on' : 'chip-off'"
           class="!rounded-lg !py-3 flex flex-col items-start"
-          @click="settings.sttKeyMode = 'admin-pool'"
+          :disabled="!isAuthorized()"
+          @click="isAuthorized() && (settings.sttKeyMode = 'admin-pool')"
         >
           <div class="font-bold">🏛 管理员共享</div>
           <div class="text-xs opacity-80 mt-1 text-left">
-            无感使用
+            {{ isAuthorized() ? '无感使用' : '需访问码（顶部输入）' }}
           </div>
         </button>
       </div>

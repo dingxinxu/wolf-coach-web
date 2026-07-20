@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router';
 import { RouterLink, RouterView } from 'vue-router';
 import { computed } from 'vue';
+import AccessBanner from './components/AccessBanner.vue';
 
 const route = useRoute();
 const navItems = [
@@ -37,6 +38,8 @@ const activePath = computed(() => route.path);
         </RouterLink>
       </nav>
     </header>
+
+    <AccessBanner />
 
     <main class="flex-1 overflow-y-auto px-4 py-4 pb-28">
       <RouterView />

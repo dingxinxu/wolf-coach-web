@@ -8,6 +8,7 @@
  * 浏览器能力检查 + 单例 recorder + 时长上限 120s（Whisper API 上限）。
  */
 import { settings, buildSTTForRequest, workerBase, isSTTReady } from '../stores/settings.js';
+import { access } from '../stores/access.js';
 
 const MAX_DURATION_MS = 120 * 1000;
 
@@ -165,9 +166,13 @@ export async function transcribe(audio, mimeType) {
     stt: buildSTTForRequest(),
   };
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (settings.sttKeyMode === 'admin-pool' && access.accessCode) {
+    headers['X-Access-Code'] = access.accessCode;
+  }
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 

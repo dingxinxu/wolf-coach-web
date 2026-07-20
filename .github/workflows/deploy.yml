@@ -67,6 +67,7 @@ jobs:
       # 8. Build frontend
       - name: Build frontend
         env:
+          VITE_WORKER_URL: ${{ vars.WORKER_URL }}
           # GitHub Pages 自动设置的 base path
           GH_PAGES_BASE: ${{ startsWith(github.repository, '/') && '/' || format('/{0}/', github.event.repository.name) }}
         run: pnpm build:web

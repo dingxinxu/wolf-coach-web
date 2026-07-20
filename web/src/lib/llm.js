@@ -6,6 +6,7 @@
  * 流式：使用 SSE，逐 token 透传到回调。
  */
 import { settings, buildLLMForRequest, workerBase, isLLMReady } from '../stores/settings.js';
+import { access } from '../stores/access.js';
 
 /**
  * 调用教练。
@@ -30,9 +31,13 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
     stream: true,
   };
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (settings.keyMode === 'admin-pool' && access.accessCode) {
+    headers['X-Access-Code'] = access.accessCode;
+  }
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
     signal,
   });

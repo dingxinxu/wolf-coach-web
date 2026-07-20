@@ -12,12 +12,12 @@ compatibility_flags = ["nodejs_compat"]
 # KV：管理员维护的"共享 Key 池"配置
 [[kv_namespaces]]
 binding = "LLM_POOL"
-id = "REPLACE_WITH_KV_ID"        # wrangler kv:namespace create LLM_POOL
-preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+id = "47a43b9a0e23497aa6e2177bd5327841"
+preview_id = "88f9298e5aee4ef8be4a9b992da0dbc5"
 
 # Worker Secret（用 wrangler secret put 设置，不要写在这里）：
-#  - ADMIN_AUD    : CF Access 应用 AUD（可选，启用 CF Access 校验时使用）
-#  - CLIENT_ID    : CF Access 应用 Client ID（可选）
+#  - ADMIN_PASSWORD : admin 鉴权密码（X-Admin-Key 头比对）
+#  - KV_ENC_KEY     : KV apiKey 加密密钥（base64，32 字节）
 
 [vars]
 # 默认 LLM 配置（用户没带自己的 Key 时，且管理员池也没配置时的兜底）

@@ -5,3 +5,9 @@ DEFAULT_LLM_API_KEY=sk-xxxxxxxx
 
 # 可选：STT (Whisper) 兜底 Key
 DEFAULT_STT_API_KEY=gsk_xxxxxxxx
+
+# admin 鉴权密码（X-Admin-Key 头比对，openssl rand -base64 18 生成）
+ADMIN_PASSWORD=change-me-to-random
+
+# KV apiKey 加密密钥（base64，32 字节，openssl rand -base64 32 生成）
+KV_ENC_KEY=change-me-to-random-base64
