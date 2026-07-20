@@ -50,18 +50,31 @@ export class Recorder {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
-    this.startedAt = 0;
     this.mimeType = '';
     this._timer = null;
     this._onStop = null;
+    this._recordedMs = 0; // 累积有效录音时长（不含暂停段）
+    this._segStart = 0; // 当前段起点（recording 状态下计时用）
   }
 
   get recording() {
     return this.mediaRecorder?.state === 'recording';
   }
 
+  get paused() {
+    return this.mediaRecorder?.state === 'paused';
+  }
+
+  /** 把"自上次 _segStart 至今"的时长累加到 _recordedMs，并重置 _segStart。 */
+  _tickSegment() {
+    if (this.recording) {
+      this._recordedMs += Date.now() - this._segStart;
+    }
+    this._segStart = Date.now();
+  }
+
   async start() {
-    if (this.recording) throw new Error('已在录音中');
+    if (this.mediaRecorder) throw new Error('已在录音中');
     if (!isRecordingSupported()) {
       throw new Error('当前浏览器不支持录音（需要 MediaRecorder API）');
     }
@@ -71,7 +84,8 @@ export class Recorder {
       mimeType: this.mimeType || undefined,
     });
     this.chunks = [];
-    this.startedAt = Date.now();
+    this._recordedMs = 0;
+    this._segStart = Date.now();
 
     this.mediaRecorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) this.chunks.push(e.data);
@@ -79,9 +93,9 @@ export class Recorder {
 
     return new Promise((resolve, reject) => {
       this._onStop = () => {
+        this._tickSegment();
         const blob = new Blob(this.chunks, { type: this.mimeType });
-        const durationMs = Date.now() - this.startedAt;
-        resolve({ blob, mimeType: this.mimeType, durationMs });
+        resolve({ blob, mimeType: this.mimeType, durationMs: this._recordedMs });
       };
       this.mediaRecorder.onerror = (e) => reject(e.error || new Error('录音失败'));
       this.mediaRecorder.onstop = () => {
@@ -91,16 +105,32 @@ export class Recorder {
       };
       this.mediaRecorder.start();
 
-      // 120s 安全上限：自动停
-      this._timer = setTimeout(() => {
-        if (this.recording) this.stop();
-      }, MAX_DURATION_MS);
+      // 120s 安全上限（按有效录音时长）：定时检查
+      this._timer = setInterval(() => {
+        if (this.elapsedSec() * 1000 >= MAX_DURATION_MS && this.recording) {
+          this.stop();
+        }
+      }, 500);
     });
   }
 
+  /** 暂停（不释放麦克风，暂停期间不采集）。 */
+  pause() {
+    if (!this.recording) return;
+    this._tickSegment();
+    this.mediaRecorder.pause();
+  }
+
+  /** 继续录音。 */
+  resume() {
+    if (!this.paused) return;
+    this._segStart = Date.now();
+    this.mediaRecorder.resume();
+  }
+
   stop() {
-    if (!this.recording) return Promise.resolve(null);
-    clearTimeout(this._timer);
+    if (!this.recording && !this.paused) return Promise.resolve(null);
+    clearInterval(this._timer);
     this._timer = null;
     return new Promise((resolve) => {
       this._onStop = resolve;
@@ -110,10 +140,10 @@ export class Recorder {
 
   /** 取消（不产生结果） */
   cancel() {
-    clearTimeout(this._timer);
+    clearInterval(this._timer);
     this._timer = null;
     this._onStop = null;
-    if (this.recording) {
+    if (this.recording || this.paused) {
       // 标记忽略后续数据
       this.chunks = [];
       this.mediaRecorder.onstop = null;
@@ -122,9 +152,11 @@ export class Recorder {
     }
   }
 
-  /** 已录时长（秒） */
+  /** 已录有效时长（秒），不含暂停段。 */
   elapsedSec() {
-    return this.recording ? Math.floor((Date.now() - this.startedAt) / 1000) : 0;
+    if (!this.mediaRecorder) return 0;
+    const live = this.recording ? Date.now() - this._segStart : 0;
+    return Math.floor((this._recordedMs + live) / 1000);
   }
 }
 

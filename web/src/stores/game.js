@@ -48,6 +48,14 @@ function freshRound(roundNo) {
     mySkill: '', // 用户夜间技能使用描述（自由文本）
     speeches: [], // [{ seat, text }]
     votes: [], // [{ from, to }]  to=null 表示弃票
+    // 上警环节（仅第 1 轮使用；其他轮保留空值，不渲染）
+    captain: {
+      runners: [], // 上警玩家座位号列表
+      withdrawn: [], // 退水玩家座位号列表
+      speeches: [], // [{ seat, text }] 警上发言
+      elected: null, // 当选警长座位号
+      badgeFlow: '', // 警徽流（自由文本，预言家常用）
+    },
     analysis: '', // LLM 返回的分析（markdown）
     analyzedAt: 0,
   };
@@ -79,7 +87,14 @@ function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return freshState();
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // 老存档兼容：给每个 round 补 captain 字段
+    if (parsed && Array.isArray(parsed.rounds)) {
+      for (const r of parsed.rounds) {
+        if (!r.captain) r.captain = { runners: [], withdrawn: [], speeches: [], elected: null, badgeFlow: '' };
+      }
+    }
+    return parsed;
   } catch {
     return freshState();
   }
@@ -155,6 +170,10 @@ export function importGame(file) {
       try {
         const data = JSON.parse(reader.result);
         if (!data.setup || !data.rounds) throw new Error('文件格式不正确');
+        // 老存档兼容：补 captain 字段
+        for (const r of data.rounds) {
+          if (!r.captain) r.captain = { runners: [], withdrawn: [], speeches: [], elected: null, badgeFlow: '' };
+        }
         Object.assign(game, data);
         resolve();
       } catch (e) {

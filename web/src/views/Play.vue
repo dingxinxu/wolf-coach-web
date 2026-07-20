@@ -72,6 +72,40 @@ function buildMessages(forReview = false) {
     if (round.mySkill) {
       lines.push(`我夜间技能：${round.mySkill}`);
     }
+    // 上警环节（仅第 1 轮有数据时输出）
+    if (round.captain) {
+      const cap = round.captain;
+      const hasCapInfo =
+        cap.runners.length ||
+        cap.withdrawn.length ||
+        cap.speeches.length ||
+        cap.elected ||
+        cap.badgeFlow;
+      if (hasCapInfo) {
+        lines.push('上警环节：');
+        if (cap.runners.length) {
+          const active = cap.runners.filter((s) => !cap.withdrawn.includes(s));
+          lines.push(`- 上警：${cap.runners.join(', ')}号`);
+          if (cap.withdrawn.length) {
+            lines.push(`- 退水：${cap.withdrawn.join(', ')}号（最终参选 ${active.length ? active.join(', ') + '号' : '无'}）`);
+          }
+        }
+        if (cap.speeches.length) {
+          lines.push('- 警上发言：');
+          for (const s of cap.speeches) {
+            lines.push(`  - ${s.seat ? s.seat + '号' : '?'}：${s.text}`);
+          }
+        }
+        if (cap.elected) {
+          lines.push(`- 当选警长：${cap.elected}号`);
+        } else if (cap.runners.length) {
+          lines.push('- 当选警长：未选出（PK / 流局）');
+        }
+        if (cap.badgeFlow) {
+          lines.push(`- 警徽流：${cap.badgeFlow}`);
+        }
+      }
+    }
     if (round.speeches.length) {
       lines.push('白天发言：');
       for (const s of round.speeches) {

@@ -16,7 +16,7 @@ import { Recorder, transcribe, isRecordingSupported } from '../lib/stt.js';
 const emit = defineEmits(['transcribed', 'error']);
 
 const recorder = new Recorder();
-const state = ref('idle'); // idle | recording | transcribing
+const state = ref('idle'); // idle | recording | paused | transcribing
 const elapsedSec = ref(0);
 const errorMsg = ref('');
 let timer = null;
@@ -36,7 +36,7 @@ async function toggle() {
       errorMsg.value = e.message || '录音启动失败（可能未授权麦克风）';
       emit('error', errorMsg.value);
     }
-  } else if (state.value === 'recording') {
+  } else if (state.value === 'recording' || state.value === 'paused') {
     clearInterval(timer);
     timer = null;
     const result = await recorder.stop();
@@ -56,6 +56,22 @@ async function toggle() {
       elapsedSec.value = 0;
     }
   }
+}
+
+function pause() {
+  if (state.value !== 'recording') return;
+  recorder.pause();
+  state.value = 'paused';
+  elapsedSec.value = recorder.elapsedSec();
+}
+
+function resume() {
+  if (state.value !== 'paused') return;
+  recorder.resume();
+  state.value = 'recording';
+  timer = setInterval(() => {
+    elapsedSec.value = recorder.elapsedSec();
+  }, 500);
 }
 
 function cancel() {
@@ -80,6 +96,8 @@ onBeforeUnmount(() => {
         'px-3 py-1.5 rounded-xl text-sm font-medium transition active:scale-95 flex items-center gap-2',
         state === 'recording'
           ? 'bg-wolf-600 text-white rec-pulse'
+          : state === 'paused'
+          ? 'bg-amber-600/80 text-white'
           : state === 'transcribing'
           ? 'bg-zinc-700 text-zinc-300'
           : 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
@@ -91,11 +109,29 @@ onBeforeUnmount(() => {
       <span v-else-if="state === 'recording'" class="tabular-nums">
         ⏺ {{ elapsedSec }}s · 点击结束
       </span>
+      <span v-else-if="state === 'paused'" class="tabular-nums">
+        ⏸ 已暂停 {{ elapsedSec }}s · 点击结束
+      </span>
       <span v-else>⏳ 转写中…</span>
     </button>
 
     <button
       v-if="state === 'recording'"
+      class="btn-ghost text-xs text-amber-400"
+      @click="pause"
+    >
+      ⏸ 暂停
+    </button>
+    <button
+      v-if="state === 'paused'"
+      class="btn-ghost text-xs text-good-500"
+      @click="resume"
+    >
+      ▶ 继续
+    </button>
+
+    <button
+      v-if="state === 'recording' || state === 'paused'"
       class="btn-ghost text-xs text-zinc-400"
       @click="cancel"
     >
