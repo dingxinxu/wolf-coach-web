@@ -1,0 +1,31 @@
+name = "wolf-coach-worker"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 路由：
+#  /            -> 健康检查
+#  /api/chat    -> 教练分析（OpenAI 兼容转发 + 注入技能 md）
+#  /api/health  -> 简单 ping
+#  /admin/api/* -> 管理员维护 LLM 配置（受 CF Access 保护）
+
+# KV：管理员维护的"共享 Key 池"配置
+[[kv_namespaces]]
+binding = "LLM_POOL"
+id = "REPLACE_WITH_KV_ID"        # wrangler kv:namespace create LLM_POOL
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+
+# Worker Secret（用 wrangler secret put 设置，不要写在这里）：
+#  - ADMIN_AUD    : CF Access 应用 AUD（可选，启用 CF Access 校验时使用）
+#  - CLIENT_ID    : CF Access 应用 Client ID（可选）
+
+[vars]
+# 默认 LLM 配置（用户没带自己的 Key 时，且管理员池也没配置时的兜底）
+# 这里只放无敏感信息的默认值；真正的 API Key 必须走 secret 或 KV
+DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1"
+DEFAULT_LLM_MODEL    = "deepseek-chat"
+DEFAULT_LLM_REASONING = "medium"   # low / medium / high / disabled
+
+# 默认 STT 配置（Groq Whisper large-v3，免费额度大、国内可访问）
+DEFAULT_STT_BASE_URL = "https://api.groq.com/openai/v1"
+DEFAULT_STT_MODEL    = "whisper-large-v3"

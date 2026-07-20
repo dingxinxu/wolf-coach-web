@@ -1,0 +1,7 @@
+# 复制为 .dev.vars 并填入真实值用于本地开发（不要提交 .dev.vars）
+# 仅当你打算用 Worker 内置 Key 兜底时才需要 DEFAULT_LLM_API_KEY。
+# 用户自带 Key 走前端透传，无需配置此项。
+DEFAULT_LLM_API_KEY=sk-xxxxxxxx
+
+# 可选：STT (Whisper) 兜底 Key
+DEFAULT_STT_API_KEY=gsk_xxxxxxxx

@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+web/dist/
+web/.vite/
+worker/dist/
+
+# Cloudflare
+.dev.vars
+.wrangler/
+
+# Env / Secrets
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Cached skill md (CI 会重新同步，但本地开发的拷贝也别忽略)
+# 注意：保持 web/public/skill 和 worker/skill 不被 ignore，CI 同步后可提交
