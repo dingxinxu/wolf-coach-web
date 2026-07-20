@@ -71,33 +71,45 @@ function back() {
 
 <template>
   <div class="space-y-4">
-    <!-- 进度 -->
-    <div class="flex items-center gap-2 text-sm text-zinc-400">
-      <span :class="step >= 1 ? 'text-wolf-400' : ''">① 板子</span>
-      <span>→</span>
-      <span :class="step >= 2 ? 'text-wolf-400' : ''">② 身份</span>
-      <span>→</span>
-      <span :class="step >= 3 ? 'text-wolf-400' : ''">③ 座位 & 规则</span>
+    <!-- 进度指示器 -->
+    <div class="flex items-center gap-1 text-xs">
+      <template v-for="(label, i) in ['板子', '身份', '座位 & 规则']" :key="i">
+        <div
+          :class="[
+            'flex-1 text-center py-1.5 rounded-lg transition',
+            step > i + 1
+              ? 'bg-good-600/20 text-good-500'
+              : step === i + 1
+              ? 'bg-wolf-600 text-white shadow-md shadow-wolf-900/40'
+              : 'bg-zinc-900 text-zinc-500',
+          ]"
+        >
+          <span class="font-semibold">{{ i + 1 }}</span> · {{ label }}
+        </div>
+        <div v-if="i < 2" class="text-zinc-600 px-0.5">›</div>
+      </template>
     </div>
 
     <!-- Step 1: 板子 -->
     <div v-if="step === 1" class="space-y-3">
-      <h2 class="text-xl font-bold">选板子</h2>
+      <h2 class="text-xl font-bold flex items-center gap-2">
+        <span>🎴</span> 选板子
+      </h2>
       <div class="grid grid-cols-1 gap-2">
         <button
           v-for="b in boardList"
           :key="b"
-          class="card text-left active:scale-[0.98] transition"
+          class="card text-left active:scale-[0.98] transition hover:!border-wolf-700"
           @click="pickBoard(b)"
         >
           <div class="flex items-center justify-between">
             <div>
-              <div class="text-lg font-bold">{{ b }}（{{ BOARDS[b].total }}人）</div>
-              <div class="text-sm text-zinc-400">
-                神职：{{ BOARDS[b].gods }} · 平民 ×{{ BOARDS[b].civs }} · 狼 ×{{ BOARDS[b].wolves }}
+              <div class="text-lg font-bold">{{ b }}<span class="text-zinc-400 font-normal">（{{ BOARDS[b].total }}人）</span></div>
+              <div class="text-sm text-zinc-400 mt-1">
+                🛡 {{ BOARDS[b].gods }} · 👥 平民 ×{{ BOARDS[b].civs }} · 🐺 狼 ×{{ BOARDS[b].wolves }}
               </div>
             </div>
-            <div class="text-2xl">›</div>
+            <div class="text-3xl text-wolf-500">›</div>
           </div>
         </button>
       </div>

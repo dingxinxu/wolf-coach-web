@@ -170,14 +170,17 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
   </div>
 
   <!-- 游戏中 -->
-  <div v-else class="space-y-4 pb-24">
+  <div v-else class="space-y-4 pb-32">
     <!-- 头部 -->
-    <div class="card">
+    <div class="card !bg-gradient-to-br from-wolf-900/30 to-zinc-900/70">
       <div class="flex items-center justify-between">
         <div>
-          <div class="font-bold">{{ phaseLabel }}</div>
-          <div class="text-xs text-zinc-500 mt-0.5">
-            存活 {{ aliveCount }}/{{ preset.total }}
+          <div class="font-bold flex items-center gap-2">
+            <span class="text-wolf-400">●</span>
+            <span>{{ phaseLabel }}</span>
+          </div>
+          <div class="text-xs text-zinc-400 mt-1">
+            存活 <span class="text-good-500 font-semibold">{{ aliveCount }}</span> / {{ preset.total }}
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -202,13 +205,13 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
     <RoundInput v-if="game.phase === 'playing'" />
 
     <!-- 操作按钮 -->
-    <div class="fixed bottom-0 left-0 right-0 max-w-3xl mx-auto bg-zinc-950/90 backdrop-blur border-t border-zinc-800 p-3 flex gap-2">
+    <div class="fixed bottom-0 left-0 right-0 max-w-3xl mx-auto bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] flex gap-2 shadow-2xl shadow-black/40">
       <button
-        class="btn-primary flex-1"
+        class="btn-primary flex-1 shadow-wolf-900/40"
         :disabled="loading"
         @click="analyze(false)"
       >
-        {{ loading ? '思考中…' : '让教练分析' }}
+        {{ loading ? '思考中…' : '🧠 让教练分析' }}
       </button>
       <button
         class="btn-secondary"

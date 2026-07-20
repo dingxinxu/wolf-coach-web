@@ -77,9 +77,9 @@ onBeforeUnmount(() => {
     <button
       v-if="supported"
       :class="[
-        'px-3 py-1.5 rounded-lg text-sm font-medium transition active:scale-95 flex items-center gap-2',
+        'px-3 py-1.5 rounded-xl text-sm font-medium transition active:scale-95 flex items-center gap-2',
         state === 'recording'
-          ? 'bg-wolf-600 text-white animate-pulse'
+          ? 'bg-wolf-600 text-white rec-pulse'
           : state === 'transcribing'
           ? 'bg-zinc-700 text-zinc-300'
           : 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
@@ -88,8 +88,8 @@ onBeforeUnmount(() => {
       @click="toggle"
     >
       <span v-if="state === 'idle'">🎙 开始录音</span>
-      <span v-else-if="state === 'recording'">
-        ⏺ 录音中 {{ elapsedSec }}s · 点击结束
+      <span v-else-if="state === 'recording'" class="tabular-nums">
+        ⏺ {{ elapsedSec }}s · 点击结束
       </span>
       <span v-else>⏳ 转写中…</span>
     </button>
