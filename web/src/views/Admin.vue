@@ -9,7 +9,7 @@
  *   - LLM/STT 共享池配置（GET/PUT /admin/api/config, /admin/api/stt）
  *   - 访问码管理（POST/GET/DELETE /admin/api/codes）
  */
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { workerBase } from '../stores/settings.js';
 import { access, setAdminKey, clearAdminKey } from '../stores/access.js';
 
@@ -189,10 +189,6 @@ async function revokeCode(hash) {
   });
   if (resp.ok) await loadCodes();
 }
-
-onMounted(() => {
-  if (isAdmin.value) loadCurrent();
-});
 </script>
 
 <template>

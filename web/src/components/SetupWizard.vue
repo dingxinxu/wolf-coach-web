@@ -274,10 +274,7 @@ function back() {
           <button
             v-for="n in preset.total"
             :key="n"
-            :class="[
-              'aspect-square rounded-lg border-2 font-semibold active:scale-95 transition',
-              mySeat === n ? '' : '',
-            ]"
+            class="aspect-square rounded-lg border-2 font-semibold active:scale-95 transition"
             :style="
               mySeat === n
                 ? 'background: linear-gradient(180deg,#c41e3a 0%,#8b0000 100%); border-color: rgba(212,175,55,0.6); color:#f4e8c1;'

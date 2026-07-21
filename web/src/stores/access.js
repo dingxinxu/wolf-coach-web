@@ -57,10 +57,6 @@ export async function verifyAccessCode(code, base) {
 }
 
 /** admin 密码（session 级） */
-export function adminKey() {
-  return state.adminKey;
-}
-
 export function setAdminKey(key) {
   state.adminKey = key;
 }

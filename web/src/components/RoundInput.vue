@@ -243,14 +243,14 @@ function isHardReady() {
           <div class="eyebrow text-gold-400/80 mb-2">警上发言（按需添加）</div>
           <div class="space-y-2">
             <div
-              v-for="(s, i) in r.captain.speeches"
+              v-for="(cap, i) in r.captain.speeches"
               :key="`cap-${i}`"
               class="rounded-lg p-2 space-y-2"
               style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.12);"
             >
               <div class="flex items-center gap-2">
                 <select
-                  v-model="s.seat"
+                  v-model="cap.seat"
                   class="rounded px-2 py-1 text-sm text-parchment focus:outline-none"
                   style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
                 >
@@ -272,7 +272,7 @@ function isHardReady() {
                 </button>
               </div>
               <textarea
-                v-model="s.text"
+                v-model="cap.text"
                 rows="3"
                 class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
                 style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
