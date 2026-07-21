@@ -22,6 +22,7 @@ preview_id = "88f9298e5aee4ef8be4a9b992da0dbc5"
 [vars]
 # 默认 LLM 配置（用户没带自己的 Key 时，且管理员池也没配置时的兜底）
 # 这里只放无敏感信息的默认值；真正的 API Key 必须走 secret 或 KV
+# 自部署请通过 /admin 配置页填共享池配置（存 KV），不要改这里
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1"
 DEFAULT_LLM_MODEL    = "deepseek-chat"
 DEFAULT_LLM_REASONING = "medium"   # low / medium / high / disabled
