@@ -154,7 +154,7 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api /admin -> 
    ```
 6. 前端【设置】页的「Worker URL」填 `https://<name>.workers.dev`。
 
-> **Worker CI 自动部署**（可选）：在仓库 Settings → Secrets 加 `CF_API_TOKEN`（Cloudflare API Token，权限 Workers Scripts:Edit）和 `CF_ACCOUNT_ID`。push main 时 `deploy-worker` job 自动跑 `wrangler deploy`。未配置时该 job 失败属预期，不影响前端部署。
+> **Worker CI 自动部署**（可选）：受仓库 Variable `ENABLE_WORKER_DEPLOY == 'true'` 显式开关控制，且需仓库 Secret `CF_API_TOKEN`（Cloudflare API Token，权限 Workers Scripts:Edit）+ `CF_ACCOUNT_ID`。三者全配齐后 push main 才会自动跑 `wrangler deploy`；未启用时 `deploy-worker` job 直接 skipped（不是 failed），不影响前端部署。
 
 ### 访问码与共享池初始化
 
@@ -221,7 +221,7 @@ Worker 部署后，访问 `https://<worker>.workers.dev/` 应返回 `{"ok":true}
 
 - **当前阶段**：MVP 完整可用 + UI 视觉打磨 + 双 Key 安全机制
 - **线上访问**：<https://dingxinxu.github.io/wolf-coach-web/>
-- **Worker 部署**：手动部署已就绪；CI 自动部署待配置 `CF_API_TOKEN`
+- **Worker 部署**：手动部署已就绪；CI 自动部署需同时配 `ENABLE_WORKER_DEPLOY=true` 变量 + `CF_API_TOKEN`/`CF_ACCOUNT_ID` Secret
 - **最新 commits**：
   - `fix(code-review): 修复 5 项 code-review 发现`
   - `feat: 板子/身份卡换用网易官方角色立绘`

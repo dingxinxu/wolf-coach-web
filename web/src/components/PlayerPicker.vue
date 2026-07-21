@@ -30,6 +30,14 @@ const emit = defineEmits(['update:bindings']);
 /** 当前展开编辑的座位 */
 const editingSeat = ref(null);
 
+// ===== 新建玩家表单 =====
+const newPlayer = ref({ name: '', avatar: AVATAR_POOL[0], styleTags: [], note: '' });
+
+// P2-16：切换 editingSeat 时重置 newPlayer 表单，避免上一次输入残留误关联到新座位
+watch(editingSeat, () => {
+  newPlayer.value = { name: '', avatar: AVATAR_POOL[0], styleTags: [], note: '' };
+});
+
 const seats = computed(() =>
   Array.from({ length: props.total }, (_, i) => i + 1)
 );
@@ -49,9 +57,6 @@ function seatPlayer(seat) {
 function edit(seat) {
   editingSeat.value = editingSeat.value === seat ? null : seat;
 }
-
-// ===== 新建玩家表单 =====
-const newPlayer = ref({ name: '', avatar: AVATAR_POOL[0], styleTags: [], note: '' });
 
 function toggleNewTag(tag) {
   const i = newPlayer.value.styleTags.indexOf(tag);

@@ -7,6 +7,7 @@
  */
 import { ref } from 'vue';
 import { settings, isLLMReady, isSTTReady } from '../stores/settings.js';
+import { worker } from '../stores/worker.js';
 import { isAuthorized } from '../stores/access.js';
 import { roster } from '../stores/players-roster.js';
 
@@ -28,13 +29,25 @@ function importRoster(e) {
   reader.onload = () => {
     try {
       const data = JSON.parse(reader.result);
-      if (!Array.isArray(data.players)) throw new Error('格式不对');
+      if (!Array.isArray(data.players)) throw new Error('格式不对（缺 players 数组）');
+      // P2-12：白名单字段过滤，防 __proto__ 等污染
+      const safeFields = ['id', 'name', 'avatar', 'styleTags', 'note', 'createdAt', 'updatedAt'];
       // 合并：按 id 去重
       const existIds = new Set(roster.players.map((p) => p.id));
-      for (const p of data.players) {
-        if (!existIds.has(p.id)) roster.players.push(p);
+      let imported = 0;
+      for (const raw of data.players) {
+        if (!raw || typeof raw !== 'object' || !raw.id || existIds.has(raw.id)) continue;
+        const safe = {};
+        for (const k of safeFields) {
+          if (k in raw) safe[k] = raw[k];
+        }
+        // styleTags 必须是数组
+        if (!Array.isArray(safe.styleTags)) safe.styleTags = [];
+        roster.players.push(safe);
+        existIds.add(safe.id);
+        imported++;
       }
-      alert(`已导入 ${data.players.length} 位玩家`);
+      alert(`已导入 ${imported} 位玩家`);
     } catch (err) {
       alert('导入失败：' + err.message);
     }
@@ -304,13 +317,13 @@ function applyPreset(p) {
     <div class="card">
       <label class="block">
         <div class="eyebrow text-gold-400/80 mb-1">Worker URL（可选）</div>
-        <input
-          v-model="settings.workerUrl"
-          type="text"
-          class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
-          style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
-          placeholder="留空 = 同 origin（默认）；自部署可填 https://xxx.workers.dev"
-        />
+          <input
+            v-model="worker.workerUrl"
+            type="text"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
+            placeholder="留空 = 同 origin（默认）；自部署可填 https://xxx.workers.dev"
+          />
         <div class="text-xs text-parchment-200/40 mt-1">
           默认前端和 Worker 同 origin 部署，留空即可。
         </div>
@@ -351,13 +364,6 @@ function applyPreset(p) {
           🗑 清空
         </button>
       </div>
-    </div>
-
-    <!-- 管理员入口（隐藏在底部） -->
-    <div class="text-center pt-4">
-      <RouterLink to="/admin" class="text-xs text-parchment-200/40 hover:text-gold-400">
-        管理员入口 →
-      </RouterLink>
     </div>
   </div>
 </template>

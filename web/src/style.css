@@ -105,6 +105,39 @@ body,
   .emo-calm { @apply text-sky-400; }
   .emo-angry { @apply text-red-500; }
   .emo-vague { @apply text-zinc-400; }
+
+  /* === P2-19：高频 inline pattern 抽取 === */
+
+  /* 渐变背景：血月深红（按钮/卡片选中态） */
+  .grad-blood {
+    background: linear-gradient(180deg, #c41e3a 0%, #8b0000 100%);
+  }
+  /* 渐变背景：金色（警长当选/选中态） */
+  .grad-gold {
+    background: linear-gradient(180deg, #e8c87a 0%, #c9a961 100%);
+  }
+  /* 渐变背景：深蓝（普通卡片默认底） */
+  .grad-night {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(10, 14, 26, 0.8) 100%);
+  }
+  /* 渐变背景：深暗（输入框/卡片内嵌区域） */
+  .grad-inset {
+    background: rgba(5, 8, 17, 0.6);
+  }
+  /* 渐变背景：金棕（上警/退水按钮选中态） */
+  .grad-captain {
+    background: linear-gradient(180deg, #6b4a1f 0%, #3a2810 100%);
+  }
+  /* 边框：古金细边 */
+  .border-gold-soft {
+    border: 1px solid rgba(212, 175, 55, 0.22);
+  }
+  .border-gold-medium {
+    border: 1px solid rgba(212, 175, 55, 0.35);
+  }
+  /* 文字：羊皮卷主色 */
+  .text-parchment-main { color: #f4e8c1; }
+  .text-parchment-soft { color: #e8d9a8; }
 }
 
 /* 教练分析段落标题（markdown h2 渲染后，AnalysisPanel v-html 注入） */
