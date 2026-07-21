@@ -5,7 +5,6 @@
  * 挂在 App.vue 顶部，所有页面可见。
  */
 import { ref } from 'vue';
-import { workerBase } from '../stores/settings.js';
 import {
   isAuthorized,
   setAccessCode,
@@ -22,7 +21,7 @@ async function submit() {
   if (!c) return;
   checking.value = true;
   error.value = '';
-  const ok = await verifyAccessCode(c, workerBase());
+  const ok = await verifyAccessCode(c);
   checking.value = false;
   if (ok) {
     setAccessCode(c);

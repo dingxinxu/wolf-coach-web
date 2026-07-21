@@ -2,13 +2,15 @@
   "name": "wolf-coach-web",
   "version": "0.1.0",
   "private": true,
-  "description": "狼人杀制胜教练 H5 — 线下对局实时辅助",
+  "description": "狼人杀制胜教练 H5 - 线下对局实时辅助",
   "scripts": {
     "sync-skill": "node scripts/sync-skill.js",
+    "convert-art": "node scripts/convert-art.js",
     "dev:web": "pnpm --filter ./web dev",
     "build:web": "pnpm --filter ./web build",
     "dev:worker": "pnpm --filter ./worker dev",
-    "deploy:worker": "pnpm --filter ./worker deploy"
+    "deploy:worker": "pnpm --filter ./worker deploy",
+    "test": "pnpm --filter ./web test"
   },
   "packageManager": "pnpm@9.0.0"
 }

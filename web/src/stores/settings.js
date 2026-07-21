@@ -1,14 +1,20 @@
 /**
- * 设置 store：管理 LLM 配置（用户自带 Key 模式）+ Worker URL。
+ * 设置 store：管理 LLM 配置（用户自带 Key 模式）。
  *
  * Key 模式（Q13/14 决策）：
  *   - 'user'      用户自带 Key（存 localStorage，每次请求透传给 Worker）
  *   - 'admin-pool' 用户没 Key，使用管理员维护的共享池（Worker KV）
  *
- * MVP 不暴露"Worker 兜底"模式给用户选——它是隐式兜底。
+ * MVP 不暴露"Worker 兜底"模式给用户选--它是隐式兜底。
+ *
+ * 注：workerUrl 和 workerBase() 已搬到 ./worker.js，本文件 re-export 是过渡兼容，
+ * 阶段 4 收尾时可彻底移除。
  */
 import { reactive, watch } from 'vue';
 import { isAuthorized } from './access.js';
+
+// 过渡兼容：让老调用点 `import { workerBase } from './settings.js'` 仍可用
+export { workerBase } from './worker.js';
 
 const STORAGE_KEY = 'wolf-coach-settings-v1';
 
@@ -22,8 +28,6 @@ const DEFAULT = {
   },
   // Key 模式：'user' | 'admin-pool'
   keyMode: 'admin-pool',
-  // Worker 后端地址（默认同 origin；本地开发用 Vite proxy 走 /api）
-  workerUrl: '',
 
   // === STT (Whisper) 配置 ===
   // 与 LLM Key 独立，因为 Groq 和 LLM 通常是不同提供商
@@ -91,9 +95,4 @@ export function buildSTTForRequest() {
     return { ...settings.userSTT };
   }
   return null;
-}
-
-/** Worker 基础 URL 优先级：settings.workerUrl -> 构建时 VITE_WORKER_URL -> '' (同 origin) */
-export function workerBase() {
-  return settings.workerUrl?.trim() || import.meta.env.VITE_WORKER_URL || '';
 }
