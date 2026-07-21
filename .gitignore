@@ -24,6 +24,9 @@ worker/dist/
 *.swo
 .DS_Store
 
+# Tooling
+.zcode/
+
 # Logs
 *.log
 npm-debug.log*
