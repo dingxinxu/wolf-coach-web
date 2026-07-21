@@ -29,3 +29,8 @@ DEFAULT_LLM_REASONING = "medium"   # low / medium / high / disabled
 # 默认 STT 配置（Groq Whisper large-v3，免费额度大、国内可访问）
 DEFAULT_STT_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_STT_MODEL    = "whisper-large-v3"
+
+# CORS 白名单（逗号分隔的 origin，不含尾斜杠）
+# 默认含 GitHub Pages 域名 + 本地开发 origin；自部署需补你的域名
+# 留空 = 拒绝所有跨域请求（同 origin 仍可调）
+ALLOWED_ORIGINS = "https://dingxinxu.github.io,http://localhost:5173,http://127.0.0.1:5173"

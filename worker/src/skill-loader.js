@@ -24,6 +24,12 @@ export async function loadSkillBundle() {
  * DeepSeek/OpenAI 兼容模型上下文窗口足够容纳（约 30K tokens）。
  *
  * 情绪判断追加（Q6 决策 A）：在【态势】段后追加【玩家情绪】段，输出格式固定。
+ *
+ * ⚠️ Prompt Cache 稳定性（P1-7）：
+ *   - DeepSeek/OpenAI 自动对 system prompt 前缀做 cache，5 分钟内命中降至 1/10 价格
+ *   - 本函数输入（bundle）和输出都是固定字符串，无时间戳/随机数，cache 稳定命中
+ *   - 修改此函数或 skill-source/*.md 会让所有用户的 cache 失效，谨慎
+ *   - 情绪判断段保留在 system（而非移到 user）是因为它固定，能被 cache
  */
 export function buildSystemPrompt(bundle) {
   const { skill, rules, strategy, glossary } = bundle;

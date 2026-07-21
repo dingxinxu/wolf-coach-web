@@ -155,6 +155,8 @@ async function saveSTT() {
 const codes = ref([]);
 const newCodeCount = ref(5);
 const newCodeNote = ref('');
+const newCodeDailyLimit = ref(100); // 每访问码每日调用上限（防滥用）
+const newCodeExpiresInDays = ref(30); // 有效期天数（0=永久）
 const generatedCodes = ref([]); // 刚生成的码（原码只显示一次）
 
 async function loadCodes() {
@@ -171,7 +173,12 @@ async function generateCodes() {
   const resp = await fetch(`${BASE}/admin/api/codes`, {
     method: 'POST',
     headers: adminHeaders(),
-    body: JSON.stringify({ count: newCodeCount.value, note: newCodeNote.value }),
+    body: JSON.stringify({
+      count: newCodeCount.value,
+      note: newCodeNote.value,
+      dailyLimit: Number(newCodeDailyLimit.value) || 100,
+      expiresInDays: Number(newCodeExpiresInDays.value) ?? 30,
+    }),
   });
   if (resp.ok) {
     const data = await resp.json();
@@ -188,6 +195,18 @@ async function revokeCode(hash) {
     headers: adminHeaders(),
   });
   if (resp.ok) await loadCodes();
+}
+
+/** 用量占比，用于列表颜色提示（>=0.9 标红） */
+function usageRatio(c) {
+  const limit = c.dailyLimit || 100;
+  const used = c.usage?.count ?? 0;
+  return used / limit;
+}
+
+/** 访问码是否已过期 */
+function isExpired(c) {
+  return !!c.expiresAt && Date.now() > c.expiresAt;
 }
 </script>
 
@@ -367,6 +386,30 @@ async function revokeCode(hash) {
               style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             />
           </label>
+          <label class="block">
+            <div class="eyebrow text-gold-400/80 mb-1">每日上限</div>
+            <input
+              v-model.number="newCodeDailyLimit"
+              type="number"
+              min="1"
+              max="1000"
+              class="w-20 rounded p-1 text-sm text-parchment focus:outline-none"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
+              title="每个访问码每日可调用 LLM/STT 的次数上限（防滥用）"
+            />
+          </label>
+          <label class="block">
+            <div class="eyebrow text-gold-400/80 mb-1">有效期(天)</div>
+            <input
+              v-model.number="newCodeExpiresInDays"
+              type="number"
+              min="0"
+              max="365"
+              class="w-20 rounded p-1 text-sm text-parchment focus:outline-none"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
+              title="0 = 永久有效；默认 30 天（防码长期泄漏）"
+            />
+          </label>
           <label class="block flex-1 min-w-[120px]">
             <div class="eyebrow text-gold-400/80 mb-1">备注</div>
             <input
@@ -406,6 +449,21 @@ async function revokeCode(hash) {
               <span class="font-mono text-parchment-200/40">{{ c.hash.slice(0, 12) }}…</span>
               <span v-if="c.note" class="text-parchment-200/60 ml-2">{{ c.note }}</span>
               <span v-if="!c.enabled" class="text-red-400 ml-2">已撤销</span>
+              <span
+                class="ml-2"
+                :class="usageRatio(c) >= 0.9 ? 'text-wolf-400' : 'text-gold-400/60'"
+                :title="`每日上限 ${c.dailyLimit || 100}`"
+              >
+                {{ c.usage?.count ?? 0 }}/{{ c.dailyLimit || 100 }}
+              </span>
+              <span
+                v-if="c.expiresAt"
+                class="ml-2"
+                :class="isExpired(c) ? 'text-wolf-400' : 'text-parchment-200/40'"
+              >
+                {{ isExpired(c) ? '已过期' : `至 ${new Date(c.expiresAt).toLocaleDateString()}` }}
+              </span>
+              <span v-else class="ml-2 text-parchment-200/30">永久</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-parchment-200/30">{{

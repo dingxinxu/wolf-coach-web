@@ -177,12 +177,12 @@ export default {
 
     // CORS
     if (request.method === 'OPTIONS') {
-      return corsResponse(new Response(null, { status: 204 }));
+      return cors(request, env, new Response(null, { status: 204 }));
     }
 
     // 健康检查
     if (url.pathname === '/' || url.pathname === '/api/health') {
-      return corsResponse(json({ ok: true, ts: Date.now() }));
+      return cors(request, env, json({ ok: true, ts: Date.now() }));
     }
 
     // 教练对话主接口
@@ -205,7 +205,7 @@ export default {
       return handleAdmin(request, env, url.pathname);
     }
 
-    return corsResponse(json({ error: 'Not Found', path: url.pathname }, 404));
+    return cors(request, env, json({ error: 'Not Found', path: url.pathname }, 404));
   },
 };
 
@@ -216,12 +216,12 @@ async function handleChat(request, env, ctx) {
   try {
     body = await request.json();
   } catch {
-    return corsResponse(json({ error: 'Invalid JSON' }, 400));
+    return cors(request, env, json({ error: 'Invalid JSON' }, 400));
   }
 
   const { messages: userMessages, stream = false } = body;
   if (!Array.isArray(userMessages) || userMessages.length === 0) {
-    return corsResponse(json({ error: 'messages required' }, 400));
+    return cors(request, env, json({ error: 'messages required' }, 400));
   }
 
   // 用户没自带 apiKey 时，校验访问码（防共享池被白嫖）
@@ -233,7 +233,7 @@ async function handleChat(request, env, ctx) {
   // 解析最终配置
   const cfg = await resolveLLMConfig(env, body);
   if (!cfg) {
-    return corsResponse(
+    return cors(request, env, 
       json(
         {
           error: 'no_api_key',
@@ -249,6 +249,14 @@ async function handleChat(request, env, ctx) {
   const systemPrompt = buildSystemPrompt(skillBundle);
   const finalMessages = [{ role: 'system', content: systemPrompt }, ...userMessages];
 
+  // Prompt cache 稳定性日志（P1-7）：固定 system prompt 才能命中 DeepSeek/OpenAI prompt cache
+  // 哈希应跨请求一致；若哈希变化说明 system prompt 被无意修改，cache 失效
+  if (typeof console !== 'undefined' && console.debug) {
+    const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(systemPrompt));
+    const hashHex = [...new Uint8Array(hashBuf)].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+    console.debug(`[chat] system_prompt len=${systemPrompt.length} hash=${hashHex} cache_stable=yes`);
+  }
+
   try {
     const upstream = await callLLM({
       ...cfg,
@@ -258,14 +266,14 @@ async function handleChat(request, env, ctx) {
 
     if (!upstream.ok) {
       const txt = await upstream.text();
-      return corsResponse(
+      return cors(request, env, 
         json({ error: 'upstream_error', status: upstream.status, detail: txt }, 502)
       );
     }
 
     // 流式：透传 SSE
     if (stream) {
-      return corsResponse(
+      return cors(request, env, 
         new Response(upstream.body, {
           headers: {
             'Content-Type': 'text/event-stream; charset=utf-8',
@@ -278,29 +286,30 @@ async function handleChat(request, env, ctx) {
 
     // 非流式：解析并标注 source（前端用于显示 Key 来源）
     const data = await upstream.json();
-    return corsResponse(json({ ...data, _keySource: cfg.source }));
+    return cors(request, env, json({ ...data, _keySource: cfg.source }));
   } catch (e) {
-    return corsResponse(json({ error: 'fetch_failed', detail: String(e) }, 502));
+    return cors(request, env, json({ error: 'fetch_failed', detail: String(e) }, 502));
   }
 }
 
 // ========== /api/verify-code 处理 ==========
 
 /**
- * 验证访问码有效性。无需鉴权（公开端点，仅查访问码是否存在于 KV 且 enabled）。
+ * 验证访问码有效性。无需鉴权（公开端点，仅查访问码是否存在于 KV 且 enabled 且未过期）。
  */
 async function handleVerifyCode(request, env) {
   let body;
   try {
     body = await request.json();
   } catch {
-    return corsResponse(json({ valid: false }, 400));
+    return cors(request, env, json({ valid: false }, 400));
   }
   const { accessCode } = body;
-  if (!accessCode) return corsResponse(json({ valid: false }));
+  if (!accessCode) return cors(request, env, json({ valid: false }));
   const codeHash = await hashAccessCode(accessCode);
   const entry = await env.LLM_POOL?.get(`code:${codeHash}`, { type: 'json' });
-  return corsResponse(json({ valid: !!entry && !!entry.enabled }));
+  const valid = !!entry && !!entry.enabled && !(entry.expiresAt && Date.now() > entry.expiresAt);
+  return cors(request, env, json({ valid }));
 }
 
 // ========== /api/transcribe 处理 ==========
@@ -353,12 +362,12 @@ async function handleTranscribe(request, env, ctx) {
   try {
     body = await request.json();
   } catch {
-    return corsResponse(json({ error: 'Invalid JSON' }, 400));
+    return cors(request, env, json({ error: 'Invalid JSON' }, 400));
   }
 
   const { audio, mimeType, stt: userSTT } = body;
   if (!audio || !mimeType) {
-    return corsResponse(json({ error: 'audio (base64) and mimeType required' }, 400));
+    return cors(request, env, json({ error: 'audio (base64) and mimeType required' }, 400));
   }
 
   // 用户没自带 stt.apiKey 时，校验访问码
@@ -369,7 +378,7 @@ async function handleTranscribe(request, env, ctx) {
 
   const cfg = await resolveSTTConfig(env, body);
   if (!cfg) {
-    return corsResponse(
+    return cors(request, env, 
       json(
         {
           error: 'no_stt_key',
@@ -388,7 +397,7 @@ async function handleTranscribe(request, env, ctx) {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     audioBlob = new Blob([bytes], { type: mimeType });
   } catch (e) {
-    return corsResponse(json({ error: 'audio_decode_failed', detail: String(e) }, 400));
+    return cors(request, env, json({ error: 'audio_decode_failed', detail: String(e) }, 400));
   }
 
   // multipart/form-data
@@ -410,15 +419,15 @@ async function handleTranscribe(request, env, ctx) {
 
     if (!upstream.ok) {
       const txt = await upstream.text();
-      return corsResponse(
+      return cors(request, env, 
         json({ error: 'stt_upstream_error', status: upstream.status, detail: txt }, 502)
       );
     }
 
     const data = await upstream.json();
-    return corsResponse(json({ text: data.text || '', _keySource: cfg.source }));
+    return cors(request, env, json({ text: data.text || '', _keySource: cfg.source }));
   } catch (e) {
-    return corsResponse(json({ error: 'stt_fetch_failed', detail: String(e) }, 502));
+    return cors(request, env, json({ error: 'stt_fetch_failed', detail: String(e) }, 502));
   }
 }
 
@@ -431,25 +440,54 @@ async function handleTranscribe(request, env, ctx) {
 function requireAdmin(request, env) {
   const key = request.headers.get('X-Admin-Key');
   if (!key || key !== env.ADMIN_PASSWORD) {
-    return corsResponse(json({ error: 'unauthorized', detail: 'admin key required' }, 401));
+    return cors(request, env, json({ error: 'unauthorized', detail: 'admin key required' }, 401));
   }
   return null;
 }
 
 /**
  * 访问码校验：用户没自带 apiKey（想用共享池）时，要求有效 X-Access-Code 头。
+ * 同时维护每访问码每日用量计数，超出 dailyLimit 拒绝（防滥用烧钱）。
  * 返回 null 表示通过，返回 Response 表示拒绝。
+ *
+ * 失败原因码：
+ *   - access_code_required: 未带访问码头
+ *   - invalid_access_code: 码不存在或已撤销
+ *   - access_code_expired: 码已过期（admin 设的 expiresAt）
+ *   - rate_limit_exceeded: 今日用量达上限
  */
 async function requireAccessCode(request, env) {
   const accessCode = request.headers.get('X-Access-Code');
   if (!accessCode) {
-    return corsResponse(json({ error: 'access_code_required', detail: '使用共享池需要访问码' }, 403));
+    return cors(request, env, json({ error: 'access_code_required', detail: '使用共享池需要访问码' }, 403));
   }
   const codeHash = await hashAccessCode(accessCode);
   const entry = await env.LLM_POOL?.get(`code:${codeHash}`, { type: 'json' });
   if (!entry || !entry.enabled) {
-    return corsResponse(json({ error: 'invalid_access_code' }, 403));
+    return cors(request, env, json({ error: 'invalid_access_code' }, 403));
   }
+
+  // 管理员设的过期时间（0 或不存在 = 永久）
+  if (entry.expiresAt && Date.now() > entry.expiresAt) {
+    return cors(request, env, json({ error: 'access_code_expired', detail: '访问码已过期，请联系管理员' }, 403));
+  }
+
+  // 每日用量计数（按 UTC 日期重置）
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  if (!entry.usage || entry.usage.day !== today) {
+    entry.usage = { day: today, count: 0 };
+  }
+  const limit = entry.dailyLimit || 100; // 默认每日 100 次
+  if (entry.usage.count >= limit) {
+    return cors(
+      request,
+      env,
+      json({ error: 'rate_limit_exceeded', detail: `今日用量已达上限 ${limit} 次`, limit, used: entry.usage.count }, 429)
+    );
+  }
+  // 自增并写回（先写再放行，防并发超额；最坏情况是失败请求也计数，可接受）
+  entry.usage.count += 1;
+  await env.LLM_POOL?.put(`code:${codeHash}`, JSON.stringify(entry));
   return null;
 }
 
@@ -460,10 +498,10 @@ async function handleAdmin(request, env, pathname) {
   // GET /admin/api/config -- 读 LLM 配置（脱敏，apiKey 解密后 mask）
   if (pathname === '/admin/api/config' && request.method === 'GET') {
     const active = await env.LLM_POOL?.get('active', { type: 'json' });
-    if (!active) return corsResponse(json({ active: null }));
+    if (!active) return cors(request, env, json({ active: null }));
     const plainKey = await decryptApiKey(active.apiKey, env);
     const { apiKey, ...safe } = active;
-    return corsResponse(
+    return cors(request, env, 
       json({ active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) } })
     );
   }
@@ -473,7 +511,7 @@ async function handleAdmin(request, env, pathname) {
     const body = await request.json();
     const { baseUrl, model, reasoning, apiKey } = body;
     if (!baseUrl || !model) {
-      return corsResponse(json({ error: 'baseUrl and model required' }, 400));
+      return cors(request, env, json({ error: 'baseUrl and model required' }, 400));
     }
     const prev = (await env.LLM_POOL?.get('active', { type: 'json' })) || {};
     const storedApiKey = apiKey ? await encryptApiKey(apiKey, env) : (prev.apiKey || '');
@@ -485,7 +523,7 @@ async function handleAdmin(request, env, pathname) {
       updatedAt: Date.now(),
     };
     await env.LLM_POOL?.put('active', JSON.stringify(next));
-    return corsResponse(json({ ok: true, hasKey: !!storedApiKey }));
+    return cors(request, env, json({ ok: true, hasKey: !!storedApiKey }));
   }
 
   // ===== STT (Whisper) 共享池 =====
@@ -493,10 +531,10 @@ async function handleAdmin(request, env, pathname) {
   // GET /admin/api/stt -- 读 STT 配置（脱敏，apiKey 解密后 mask）
   if (pathname === '/admin/api/stt' && request.method === 'GET') {
     const active = await env.LLM_POOL?.get('active_stt', { type: 'json' });
-    if (!active) return corsResponse(json({ active: null }));
+    if (!active) return cors(request, env, json({ active: null }));
     const plainKey = await decryptApiKey(active.apiKey, env);
     const { apiKey, ...safe } = active;
-    return corsResponse(
+    return cors(request, env, 
       json({ active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) } })
     );
   }
@@ -506,7 +544,7 @@ async function handleAdmin(request, env, pathname) {
     const body = await request.json();
     const { baseUrl, model, apiKey } = body;
     if (!baseUrl || !model) {
-      return corsResponse(json({ error: 'baseUrl and model required' }, 400));
+      return cors(request, env, json({ error: 'baseUrl and model required' }, 400));
     }
     const prev = (await env.LLM_POOL?.get('active_stt', { type: 'json' })) || {};
     const storedApiKey = apiKey ? await encryptApiKey(apiKey, env) : (prev.apiKey || '');
@@ -517,7 +555,7 @@ async function handleAdmin(request, env, pathname) {
       updatedAt: Date.now(),
     };
     await env.LLM_POOL?.put('active_stt', JSON.stringify(next));
-    return corsResponse(json({ ok: true, hasKey: !!storedApiKey }));
+    return cors(request, env, json({ ok: true, hasKey: !!storedApiKey }));
   }
 
   // ===== 访问码管理 =====
@@ -527,15 +565,20 @@ async function handleAdmin(request, env, pathname) {
     const body = await request.json();
     const count = Math.min(body?.count || 5, 50);
     const note = body?.note || '';
+    // 每日调用上限：1-1000，默认 100（防滥用烧钱）
+    const dailyLimit = Math.min(Math.max(Number(body?.dailyLimit) || 100, 1), 1000);
+    // 有效期天数：0=永久，1-365，默认 30 天（防码长期泄漏）
+    const expiresInDays = Math.min(Math.max(Number(body?.expiresInDays) ?? 30, 0), 365);
+    const expiresAt = expiresInDays > 0 ? Date.now() + expiresInDays * 24 * 60 * 60 * 1000 : 0;
     const codes = [];
     for (let i = 0; i < count; i++) {
       const code = generateAccessCode();
       const hash = await hashAccessCode(code);
-      const entry = { note, createdAt: Date.now(), enabled: true };
+      const entry = { note, createdAt: Date.now(), enabled: true, dailyLimit, expiresAt };
       await env.LLM_POOL?.put(`code:${hash}`, JSON.stringify(entry));
-      codes.push({ code, hash, note, createdAt: entry.createdAt });
+      codes.push({ code, hash, note, createdAt: entry.createdAt, dailyLimit, expiresAt });
     }
-    return corsResponse(json({ codes }));
+    return cors(request, env, json({ codes }));
   }
 
   // GET /admin/api/codes -- 列出所有访问码（不含原码）
@@ -546,20 +589,20 @@ async function handleAdmin(request, env, pathname) {
       const v = await env.LLM_POOL?.get(k.name, { type: 'json' });
       if (v) codes.push({ hash: k.name.replace('code:', ''), ...v });
     }
-    return corsResponse(json({ codes }));
+    return cors(request, env, json({ codes }));
   }
 
   // DELETE /admin/api/codes/:hash -- 撤销访问码
   if (pathname.startsWith('/admin/api/codes/') && request.method === 'DELETE') {
     const hash = pathname.replace('/admin/api/codes/', '');
     const entry = await env.LLM_POOL?.get(`code:${hash}`, { type: 'json' });
-    if (!entry) return corsResponse(json({ error: 'not_found' }, 404));
+    if (!entry) return cors(request, env, json({ error: 'not_found' }, 404));
     entry.enabled = false;
     await env.LLM_POOL?.put(`code:${hash}`, JSON.stringify(entry));
-    return corsResponse(json({ ok: true }));
+    return cors(request, env, json({ ok: true }));
   }
 
-  return corsResponse(json({ error: 'Not Found' }, 404));
+  return cors(request, env, json({ error: 'Not Found' }, 404));
 }
 
 function maskKey(k) {
@@ -577,8 +620,18 @@ function json(data, status = 200) {
   });
 }
 
-function corsResponse(res) {
-  res.headers.set('Access-Control-Allow-Origin', '*');
+function cors(request, env, res) {
+  // CORS 白名单：只对 env.ALLOWED_ORIGINS 内的 origin 返回 Access-Control-Allow-Origin
+  // 同源请求（无 Origin 头）和不在白名单的 origin 都不设该头 -> 浏览器拒绝跨域读
+  const origin = request.headers.get('Origin') || '';
+  const allowed = (env?.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (origin && allowed.includes(origin)) {
+    res.headers.set('Access-Control-Allow-Origin', origin);
+    res.headers.set('Vary', 'Origin');
+  }
   res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Key, X-Access-Code');
   return res;
