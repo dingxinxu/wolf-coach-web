@@ -14,7 +14,7 @@ import { reactive, watch } from 'vue';
 
 // GitHub Pages 部署在子路径（/wolf-coach-web/），public/ 下的资源引用需带 base 前缀
 const BASE = import.meta.env.BASE_URL || '/';
-const icon = (name) => `${BASE}role-icons/${name}.svg`;
+const icon = (name) => `${BASE}role-art/${name}.png`;
 
 const STORAGE_KEY = 'wolf-coach-game-v1';
 
@@ -22,33 +22,34 @@ const STORAGE_KEY = 'wolf-coach-game-v1';
 export const BOARDS = {
   '9预女猎': {
     total: 9, gods: '预言家/女巫/猎人', civs: 3, wolves: 3, hasCaptain: true,
-    cover: icon('board-9'),
+    cover: icon('seer'),     // 板子封面取代表性神职立绘
   },
   '12预女猎守': {
     total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true,
-    cover: icon('board-12-guard'),
+    cover: icon('guard'),
   },
   '12预女猎白': {
     total: 12, gods: '预言家/女巫/猎人/白痴', civs: 4, wolves: 4, hasCaptain: true,
-    cover: icon('board-12-idiot'),
+    cover: icon('idiot'),
   },
 };
 
 /**
- * 身份表（含图标 + 主题色）。
+ * 身份表（含网易官方立绘 + 主题色）。
  * key 仍是中文 label（向后兼容：myRole 比较仍按 label），其他字段只用于渲染。
- * accent 用 CSS filter 的预设 key，在 SetupWizard 里映射成具体 filter 字符串。
+ * accent 用于选中态边框/glow 颜色，按阵营分组：
+ *   神职 = gold（金）、平民 = steel（钢蓝）、狼人 = blood（血月红）
  */
 export const ROLES = [
   { label: '预言家', icon: icon('seer'),       accent: 'gold' },
-  { label: '女巫',   icon: icon('witch'),       accent: 'purple' },
-  { label: '猎人',   icon: icon('hunter'),      accent: 'blood' },
-  { label: '守卫',   icon: icon('guard'),       accent: 'steel' },
-  { label: '白痴',   icon: icon('idiot'),       accent: 'parchment' },
+  { label: '女巫',   icon: icon('witch'),       accent: 'gold' },
+  { label: '猎人',   icon: icon('hunter'),      accent: 'gold' },
+  { label: '守卫',   icon: icon('guard'),       accent: 'gold' },
+  { label: '白痴',   icon: icon('idiot'),       accent: 'gold' },
   { label: '平民',   icon: icon('civilian'),    accent: 'steel' },
   { label: '狼人',   icon: icon('werewolf'),    accent: 'blood' },
   { label: '狼王',   icon: icon('wolf-king'),   accent: 'blood' },
-  { label: '白狼王', icon: icon('white-wolf'),  accent: 'parchment' },
+  { label: '白狼王', icon: icon('white-wolf'),  accent: 'blood' },
   { label: '其他',   icon: '',                  accent: 'parchment' },
 ];
 

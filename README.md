@@ -191,12 +191,13 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api -> 8787
 
 MIT
 
-## 🎨 素材归因
+## 🎨 素材归因与版权声明
 
-`web/public/role-icons/` 下的 SVG 来自 [game-icons.net](https://game-icons.net)，
-按 [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) 许可使用。
+`web/public/role-art/` 下的 9 张角色立绘（seer/witch/hunter/guard/idiot/civilian/werewolf/wolf-king/white-wolf）
+来自**网易《狼人杀》官方卡牌图**（https://langrensha.163.com 卡牌展示栏目）。
 
-- 作者：Lorc（除 `idiot.svg`、`civilian.svg`、`board-12-idiot.svg` 由 Delapouite 创作）
-- 项目内已通过 CSS `filter` 重新着色以匹配血月主题
-- 原始素材：https://game-icons.net
+- **版权归原作者（网易公司）所有**
+- 本项目为开源、非商业用途的个人技术演示，仅作风格参考使用
+- 如网易方主张权利，请通过 Issue 联系，将在 24 小时内移除并清空 git 历史
+- 商业部署前**必须**替换为自有/已授权素材
 

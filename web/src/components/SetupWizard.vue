@@ -30,20 +30,38 @@ const boardList = Object.keys(BOARDS);
 const preset = computed(() => (board.value ? BOARDS[board.value] : null));
 
 /**
- * 把 game-icons.net 黑底白线稿转成与血月主题协调的主题色。
- * 原图 fill="#fff" → 经 invert → sepia → hue-rotate 调出金/血/钢/紫。
+ * 按 accent 给出选中态的色板（边框/背景/glow/文字/标记点）。
+ * accent 分组：神职=gold、平民=steel、狼人=blood、其他=parchment
  */
-const ACCENT_FILTER = {
-  // 古金（神职）：温暖金色调
-  gold:      'invert(1) sepia(1) saturate(3) hue-rotate(-15deg) brightness(0.95)',
-  // 血月红（狼人/猎人攻击性）
-  blood:     'invert(1) sepia(1) saturate(4) hue-rotate(-50deg) brightness(0.85)',
-  // 冷钢蓝（守卫/平民）
-  steel:     'invert(1) sepia(1) saturate(2) hue-rotate(160deg) brightness(0.85)',
-  // 暗紫（女巫、神秘）
-  purple:    'invert(1) sepia(1) saturate(3) hue-rotate(220deg) brightness(0.85)',
-  // 羊皮米（白痴、白狼王）
-  parchment: 'invert(1) sepia(1) saturate(1.5) hue-rotate(-5deg) brightness(0.9)',
+const ACCENT_HEX = {
+  gold: {
+    border: 'rgba(212,175,55,0.85)',
+    bg:     'linear-gradient(180deg, rgba(74,62,28,0.7) 0%, rgba(42,33,12,0.85) 100%)',
+    glow:   'rgba(212,175,55,0.55)',
+    text:   '#f4e8c1',
+    dot:    '#d4af37',
+  },
+  blood: {
+    border: 'rgba(196,30,58,0.85)',
+    bg:     'linear-gradient(180deg, rgba(74,2,2,0.7) 0%, rgba(42,2,2,0.85) 100%)',
+    glow:   'rgba(220,38,38,0.55)',
+    text:   '#f4e8c1',
+    dot:    '#dc2626',
+  },
+  steel: {
+    border: 'rgba(74,111,165,0.85)',
+    bg:     'linear-gradient(180deg, rgba(28,42,62,0.7) 0%, rgba(12,20,32,0.85) 100%)',
+    glow:   'rgba(74,111,165,0.55)',
+    text:   '#f4e8c1',
+    dot:    '#4a6fa5',
+  },
+  parchment: {
+    border: 'rgba(244,232,193,0.6)',
+    bg:     'linear-gradient(180deg, rgba(62,55,38,0.6) 0%, rgba(32,28,18,0.85) 100%)',
+    glow:   'rgba(244,232,193,0.4)',
+    text:   '#f4e8c1',
+    dot:    '#cdb885',
+  },
 };
 
 function pickBoard(b) {
@@ -126,42 +144,43 @@ function back() {
           class="relative overflow-hidden text-left active:scale-[0.98] transition"
           style="
             border-radius: 14px;
-            border: 1px solid rgba(212,175,55,0.28);
-            background: linear-gradient(135deg, rgba(30,41,59,0.85) 0%, rgba(10,14,26,0.95) 75%);
-            box-shadow: inset 0 1px 0 rgba(212,175,55,0.15), 0 4px 16px rgba(0,0,0,0.45);
-            min-height: 96px;
+            border: 1px solid rgba(212,175,55,0.35);
+            background: linear-gradient(135deg, #1a1f2e 0%, #0a0e1a 75%);
+            box-shadow: inset 0 1px 0 rgba(212,175,55,0.18), 0 6px 20px rgba(0,0,0,0.5);
+            min-height: 112px;
           "
           @click="pickBoard(b)"
         >
-          <!-- 背景插画：放大、低透明度、右侧居中 -->
+          <!-- 右侧代表性角色立绘（网易官方卡牌图） -->
           <img
             :src="BOARDS[b].cover"
             alt=""
             aria-hidden="true"
+            loading="lazy"
             class="absolute pointer-events-none select-none"
             style="
-              right: -16px; top: 50%; transform: translateY(-50%);
-              width: 144px; height: 144px;
-              filter: invert(1) sepia(1) saturate(2.5) hue-rotate(-15deg) brightness(0.85);
-              opacity: 0.22;
-              mix-blend-mode: screen;
+              right: -10px; top: 50%; transform: translateY(-50%);
+              height: 130%;
+              filter: drop-shadow(0 0 12px rgba(220,38,38,0.15));
+              opacity: 0.95;
             "
           />
-          <!-- 暗角遮罩，让文字易读 -->
+          <!-- 左侧暗角，让文字易读 -->
           <div
             class="absolute inset-0 pointer-events-none"
-            style="background: linear-gradient(90deg, rgba(5,8,17,0.85) 0%, rgba(5,8,17,0.45) 55%, rgba(5,8,17,0.1) 100%);"
+            style="background: linear-gradient(90deg, rgba(10,14,26,0.92) 0%, rgba(10,14,26,0.7) 45%, rgba(10,14,26,0) 70%);"
           />
-          <div class="relative flex items-center justify-between p-4">
-            <div>
-              <div class="font-serif text-lg font-bold text-parchment">
-                {{ b }}<span class="text-gold-400 font-normal text-base">（{{ BOARDS[b].total }}人）</span>
-              </div>
-              <div class="text-sm text-parchment-200/70 mt-1">
-                🛡 {{ BOARDS[b].gods }} · 👥 平民 ×{{ BOARDS[b].civs }} · 🐺 狼 ×{{ BOARDS[b].wolves }}
-              </div>
+          <div class="relative p-4 pr-32">
+            <div class="font-serif text-lg font-bold text-parchment">
+              {{ b }}<span class="text-gold-400 font-normal text-base">（{{ BOARDS[b].total }}人）</span>
             </div>
-            <div class="text-2xl text-gold-400/70">›</div>
+            <div class="text-sm text-parchment-200/75 mt-1 leading-relaxed">
+              🛡 {{ BOARDS[b].gods }}<br/>
+              👥 平民 ×{{ BOARDS[b].civs }} · 🐺 狼 ×{{ BOARDS[b].wolves }}
+            </div>
+            <div class="mt-2 text-gold-400 text-xs flex items-center gap-1">
+              选择 <span class="text-base">›</span>
+            </div>
           </div>
         </button>
       </div>
@@ -173,47 +192,71 @@ function back() {
         <h2 class="font-serif text-xl font-bold text-parchment">你的身份（{{ board }}）</h2>
         <button class="btn-ghost text-sm" @click="back">← 返回</button>
       </div>
+      <!-- 角色卡网格：每张卡用网易立绘作主体 -->
       <div class="grid grid-cols-3 gap-2">
         <button
           v-for="r in ROLES"
           :key="r.label"
-          :style="
-            myRole === r.label
-              ? {
-                background: 'linear-gradient(180deg, rgba(196,30,58,0.5) 0%, rgba(74,2,2,0.85) 100%)',
-                borderColor: 'rgba(212,175,55,0.7)',
-                color: '#f4e8c1',
-                boxShadow: '0 0 14px -3px rgba(220,38,38,0.55), inset 0 1px 0 rgba(212,175,55,0.2)',
-              }
-              : {
-                background: 'linear-gradient(180deg, rgba(30,41,59,0.7) 0%, rgba(10,14,26,0.8) 100%)',
-                borderColor: 'rgba(212,175,55,0.22)',
-                color: '#e8d9a8',
-              }
-          "
-          style="
-            border-width: 1.5px;
-            border-style: solid;
-            border-radius: 12px;
-            padding: 10px 6px 8px;
-            transition: transform 0.1s, border-color 0.2s, background 0.2s;
-          "
-          class="flex flex-col items-center justify-start active:scale-95"
+          :style="{
+            borderWidth: '2px',
+            borderStyle: 'solid',
+            borderColor: myRole === r.label
+              ? ACCENT_HEX[r.accent].border
+              : 'rgba(212,175,55,0.18)',
+            background: myRole === r.label
+              ? ACCENT_HEX[r.accent].bg
+              : 'linear-gradient(180deg, rgba(26,31,46,0.85) 0%, rgba(10,14,26,0.9) 100%)',
+            boxShadow: myRole === r.label
+              ? `0 0 18px -4px ${ACCENT_HEX[r.accent].glow}, inset 0 1px 0 rgba(212,175,55,0.22)`
+              : 'inset 0 1px 0 rgba(212,175,55,0.08), 0 2px 8px rgba(0,0,0,0.35)',
+            borderRadius: '12px',
+            transition: 'transform 0.12s, border-color 0.2s, background 0.2s, box-shadow 0.2s',
+          }"
+          class="relative overflow-hidden flex flex-col active:scale-95"
           @click="pickRole(r)"
         >
-          <!-- 角色图标（按主题色着色） -->
-          <img
-            v-if="r.icon"
-            :src="r.icon"
-            :alt="r.label"
-            :style="{ filter: ACCENT_FILTER[r.accent] || ACCENT_FILTER.parchment }"
-            style="width: 40px; height: 40px; object-fit: contain; margin-bottom: 4px;"
-          />
-          <span
-            v-else
-            style="width: 40px; height: 40px; line-height: 40px; font-size: 24px; margin-bottom: 4px; opacity: 0.7;"
-          >❓</span>
-          <span class="text-sm font-medium" style="font-family: var(--font-serif, system-serif);">{{ r.label }}</span>
+          <!-- 立绘区域（顶大部分） -->
+          <div class="relative" style="height: 96px; overflow: hidden;">
+            <img
+              v-if="r.icon"
+              :src="r.icon"
+              :alt="r.label"
+              loading="lazy"
+              class="absolute inset-0 w-full h-full"
+              style="object-fit: cover; object-position: center top;"
+            />
+            <div
+              v-else
+              class="absolute inset-0 flex items-center justify-center text-3xl"
+              style="background: linear-gradient(180deg, #1a1f2e 0%, #0a0e1a 100%);"
+            >❓</div>
+            <!-- 底部渐变，让名字条易读 -->
+            <div
+              class="absolute inset-x-0 bottom-0 h-12 pointer-events-none"
+              style="background: linear-gradient(180deg, rgba(10,14,26,0) 0%, rgba(10,14,26,0.95) 100%);"
+            />
+            <!-- 阵营标记（左上角小宝石） -->
+            <div
+              class="absolute top-1 left-1 rounded-full"
+              :style="{
+                width: '8px', height: '8px',
+                background: ACCENT_HEX[r.accent].dot,
+                boxShadow: `0 0 6px ${ACCENT_HEX[r.accent].dot}`,
+              }"
+            />
+          </div>
+          <!-- 名字条 -->
+          <div
+            class="relative px-1 py-1.5 text-center"
+            :style="{
+              fontFamily: 'var(--font-serif, system-serif)',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: myRole === r.label ? ACCENT_HEX[r.accent].text : '#e8d9a8',
+            }"
+          >
+            {{ r.label }}
+          </div>
         </button>
       </div>
     </div>
