@@ -89,33 +89,36 @@ defineExpose({
 
 <template>
   <div class="space-y-2">
-    <div class="text-sm text-zinc-400">熟人玩家（可选，让教练"认识"他们）</div>
+    <div class="eyebrow text-gold-400/80">熟人玩家（可选，让教练"认识"他们）</div>
 
     <div class="grid grid-cols-1 gap-1.5">
       <div
         v-for="seat in seats"
         :key="seat"
-        :class="[
-          'flex items-center gap-2 p-2 rounded-lg border',
+        class="flex items-center gap-2 p-2 rounded-lg border"
+        :style="
           seatPlayer(seat)
-            ? 'bg-zinc-900 border-zinc-700'
-            : 'bg-zinc-950 border-zinc-800',
-          seat === mySeat ? 'opacity-50' : '',
-        ]"
+            ? 'background: rgba(17,24,39,0.6); border-color: rgba(212,175,55,0.25);'
+            : 'background: rgba(5,8,17,0.5); border-color: rgba(212,175,55,0.12);'
+        "
+        :class="seat === mySeat ? 'opacity-50' : ''"
       >
-        <div class="w-8 h-8 flex items-center justify-center rounded bg-wolf-700 font-bold">
+        <div
+          class="w-8 h-8 flex items-center justify-center rounded font-serif font-bold"
+          style="background: linear-gradient(135deg, rgba(212,175,55,0.25) 0%, rgba(139,0,0,0.4) 100%); border: 1px solid rgba(212,175,55,0.4); color:#e8c87a;"
+        >
           {{ seat }}
         </div>
 
-        <div v-if="seat === mySeat" class="text-xs text-zinc-500">你自己（无需绑定）</div>
+        <div v-if="seat === mySeat" class="text-xs text-parchment-200/40">你自己（无需绑定）</div>
 
         <template v-else-if="seatPlayer(seat)">
           <div class="text-xl">{{ seatPlayer(seat).avatar }}</div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate">
+            <div class="text-sm font-medium truncate text-parchment">
               {{ seatPlayer(seat).name || '未命名' }}
             </div>
-            <div v-if="seatPlayer(seat).styleTags.length" class="text-xs text-zinc-500 truncate">
+            <div v-if="seatPlayer(seat).styleTags.length" class="text-xs text-gold-400/60 truncate">
               {{ seatPlayer(seat).styleTags.join(' / ') }}
             </div>
           </div>
@@ -124,7 +127,7 @@ defineExpose({
         </template>
 
         <template v-else>
-          <div class="text-sm text-zinc-500 flex-1">未绑定</div>
+          <div class="text-sm text-parchment-200/40 flex-1">未绑定</div>
           <button class="btn-ghost text-xs" @click="edit(seat)">+ 关联</button>
         </template>
       </div>
@@ -133,39 +136,39 @@ defineExpose({
     <!-- 编辑/新建面板 -->
     <div
       v-if="editingSeat"
-      class="bg-zinc-900 border border-zinc-700 rounded-lg p-3 space-y-3"
+      class="rounded-lg p-3 space-y-3"
+      style="background: rgba(17,24,39,0.7); border: 1px solid rgba(212,175,55,0.25);"
     >
       <template v-if="seatPlayer(editingSeat)">
         <!-- 编辑现有 -->
-        <div class="text-xs text-zinc-500">编辑 {{ seatPlayer(editingSeat).name }}</div>
+        <div class="eyebrow text-gold-400/70">编辑 {{ seatPlayer(editingSeat).name }}</div>
 
         <label class="block">
-          <div class="text-xs text-zinc-400 mb-1">昵称</div>
+          <div class="eyebrow text-gold-400/60 mb-1">昵称</div>
           <input
             :value="seatPlayer(editingSeat).name"
             @input="updatePlayer(seatPlayer(editingSeat).id, { name: $event.target.value })"
             type="text"
-            class="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm"
+            class="w-full rounded p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           />
         </label>
 
         <div>
-          <div class="text-xs text-zinc-400 mb-1">头像</div>
+          <div class="eyebrow text-gold-400/60 mb-1">头像</div>
           <div class="flex flex-wrap gap-1">
             <button
               v-for="emoji in AVATAR_POOL.slice(0, 16)"
               :key="emoji"
-              :class="[
-                'w-8 h-8 rounded text-lg',
-                seatPlayer(editingSeat).avatar === emoji ? 'bg-wolf-600' : 'bg-zinc-800',
-              ]"
+              class="w-8 h-8 rounded text-lg"
+              :style="seatPlayer(editingSeat).avatar === emoji ? 'background: linear-gradient(180deg,#c41e3a 0%,#8b0000 100%); border:1px solid rgba(212,175,55,0.5);' : 'background: rgba(30,41,59,0.5); border:1px solid rgba(212,175,55,0.15);'"
               @click="updatePlayer(seatPlayer(editingSeat).id, { avatar: emoji })"
             >{{ emoji }}</button>
           </div>
         </div>
 
         <div>
-          <div class="text-xs text-zinc-400 mb-1">风格标签</div>
+          <div class="eyebrow text-gold-400/60 mb-1">风格标签</div>
           <div class="flex flex-wrap gap-1">
             <button
               v-for="tag in STYLE_TAGS"
@@ -177,12 +180,13 @@ defineExpose({
         </div>
 
         <label class="block">
-          <div class="text-xs text-zinc-400 mb-1">备注</div>
+          <div class="eyebrow text-gold-400/60 mb-1">备注</div>
           <textarea
             :value="seatPlayer(editingSeat).note"
             @input="updatePlayer(seatPlayer(editingSeat).id, { note: $event.target.value })"
             rows="2"
-            class="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm"
+            class="w-full rounded p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           ></textarea>
         </label>
 
@@ -199,11 +203,11 @@ defineExpose({
 
       <template v-else>
         <!-- 关联现有 / 新建 -->
-        <div class="text-xs text-zinc-500">为 {{ editingSeat }} 号关联玩家</div>
+        <div class="eyebrow text-gold-400/70">为 {{ editingSeat }} 号关联玩家</div>
 
         <!-- 现有玩家快速关联 -->
         <div v-if="roster.players.length" class="space-y-1">
-          <div class="text-xs text-zinc-400">从档案库选：</div>
+          <div class="eyebrow text-gold-400/60">从档案库选：</div>
           <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
             <button
               v-for="p in roster.players"
@@ -216,13 +220,14 @@ defineExpose({
           </div>
         </div>
 
-        <div class="border-t border-zinc-800 pt-2">
-          <div class="text-xs text-zinc-400 mb-2">新建：</div>
+        <div class="pt-2" style="border-top: 1px solid rgba(212,175,55,0.15);">
+          <div class="eyebrow text-gold-400/60 mb-2">新建：</div>
           <label class="block mb-2">
             <input
               v-model="newPlayer.name"
               type="text"
-              class="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm"
+              class="w-full rounded p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
               placeholder="昵称 / 外号"
             />
           </label>
@@ -231,10 +236,8 @@ defineExpose({
               <button
                 v-for="emoji in AVATAR_POOL.slice(0, 12)"
                 :key="emoji"
-                :class="[
-                  'w-8 h-8 rounded text-lg',
-                  newPlayer.avatar === emoji ? 'bg-wolf-600' : 'bg-zinc-800',
-                ]"
+                class="w-8 h-8 rounded text-lg"
+                :style="newPlayer.avatar === emoji ? 'background: linear-gradient(180deg,#c41e3a 0%,#8b0000 100%); border:1px solid rgba(212,175,55,0.5);' : 'background: rgba(30,41,59,0.5); border:1px solid rgba(212,175,55,0.15);'"
                 @click="newPlayer.avatar = emoji"
               >{{ emoji }}</button>
             </div>

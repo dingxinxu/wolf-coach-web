@@ -197,44 +197,53 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <h1 class="text-2xl font-bold">管理员</h1>
+    <h1 class="font-serif text-2xl font-bold text-parchment">管理员</h1>
 
     <!-- 未登录：密码输入 -->
     <div v-if="!isAdmin()" class="card space-y-3">
-      <div class="font-semibold">管理员登录</div>
-      <div class="text-xs text-zinc-500">输入管理员密码（Worker ADMIN_PASSWORD）</div>
+      <div class="font-serif font-semibold text-parchment">管理员登录</div>
+      <div class="text-xs text-parchment-200/50">输入管理员密码（Worker ADMIN_PASSWORD）</div>
       <input
         v-model="adminKeyInput"
         type="password"
-        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+        class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+        style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
         placeholder="管理员密码"
         @keyup.enter="login"
       />
       <button class="btn-primary w-full" @click="login">登录</button>
-      <div v-if="loginError" class="text-red-400 text-xs bg-red-900/20 rounded p-2">
+      <div
+        v-if="loginError"
+        class="text-wolf-400 text-xs rounded p-2"
+        style="background: rgba(74,2,2,0.35);"
+      >
         ⚠️ {{ loginError }}
       </div>
     </div>
 
     <!-- 已登录：配置管理 -->
     <div v-else>
-      <div class="card bg-zinc-900/50 flex items-center justify-between">
-        <div class="text-sm text-zinc-400">✓ 已登录</div>
+      <div class="card flex items-center justify-between" style="background: rgba(17,24,39,0.5);">
+        <div class="text-sm text-steel-500">✓ 已登录</div>
         <button class="text-xs text-wolf-400 hover:text-wolf-300" @click="logout">退出</button>
       </div>
 
-      <div v-if="error" class="text-wolf-400 text-sm bg-wolf-900/30 rounded p-3">
+      <div
+        v-if="error"
+        class="text-wolf-400 text-sm rounded p-3"
+        style="background: rgba(74,2,2,0.3);"
+      >
         ⚠️ {{ error }}
       </div>
 
       <!-- 当前激活 LLM -->
       <div v-if="current" class="card">
-        <div class="text-sm font-semibold mb-2">当前 LLM 配置</div>
-        <div class="text-xs text-zinc-400 space-y-1">
-          <div>Base URL: <code>{{ current.baseUrl }}</code></div>
-          <div>Model: <code>{{ current.model }}</code></div>
-          <div>Reasoning: <code>{{ current.reasoning }}</code></div>
-          <div>Key: <code>{{ current.apiKeyMasked || '(未配置)' }}</code></div>
+        <div class="text-sm font-serif font-semibold mb-2 text-parchment">当前 LLM 配置</div>
+        <div class="text-xs text-parchment-200/60 space-y-1">
+          <div>Base URL: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ current.baseUrl }}</code></div>
+          <div>Model: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ current.model }}</code></div>
+          <div>Reasoning: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ current.reasoning }}</code></div>
+          <div>Key: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ current.apiKeyMasked || '(未配置)' }}</code></div>
           <div v-if="current.updatedAt">
             更新时间: {{ new Date(current.updatedAt).toLocaleString() }}
           </div>
@@ -243,28 +252,31 @@ onMounted(() => {
 
       <!-- 更新 LLM 配置 -->
       <div class="card space-y-3">
-        <div class="font-semibold">更新 LLM 配置</div>
+        <div class="font-serif font-semibold text-parchment">更新 LLM 配置</div>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Base URL</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Base URL</div>
           <input
             v-model="form.baseUrl"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Model</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Model</div>
           <input
             v-model="form.model"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Reasoning</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Reasoning</div>
           <select
             v-model="form.reasoning"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           >
             <option value="disabled">disabled</option>
             <option value="low">low</option>
@@ -273,13 +285,14 @@ onMounted(() => {
           </select>
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">
-            API Key <span class="text-zinc-600">（留空 = 保持不变）</span>
+          <div class="eyebrow text-gold-400/80 mb-1">
+            API Key <span class="text-parchment-200/30">（留空 = 保持不变）</span>
           </div>
           <input
             v-model="form.apiKey"
             type="password"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="sk-..."
             autocomplete="off"
           />
@@ -291,41 +304,44 @@ onMounted(() => {
 
       <!-- 当前 STT 配置 -->
       <div v-if="currentSTT" class="card">
-        <div class="text-sm font-semibold mb-2">当前 STT 配置</div>
-        <div class="text-xs text-zinc-400 space-y-1">
-          <div>Base URL: <code>{{ currentSTT.baseUrl }}</code></div>
-          <div>Model: <code>{{ currentSTT.model }}</code></div>
-          <div>Key: <code>{{ currentSTT.apiKeyMasked || '(未配置)' }}</code></div>
+        <div class="text-sm font-serif font-semibold mb-2 text-parchment">当前 STT 配置</div>
+        <div class="text-xs text-parchment-200/60 space-y-1">
+          <div>Base URL: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ currentSTT.baseUrl }}</code></div>
+          <div>Model: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ currentSTT.model }}</code></div>
+          <div>Key: <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">{{ currentSTT.apiKeyMasked || '(未配置)' }}</code></div>
         </div>
       </div>
 
       <!-- 更新 STT 配置 -->
       <div class="card space-y-3">
-        <div class="font-semibold">更新 STT 配置（Groq Whisper）</div>
+        <div class="font-serif font-semibold text-parchment">更新 STT 配置（Groq Whisper）</div>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Base URL</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Base URL</div>
           <input
             v-model="sttForm.baseUrl"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Model</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Model</div>
           <input
             v-model="sttForm.model"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">
-            Groq API Key <span class="text-zinc-600">（留空 = 保持不变）</span>
+          <div class="eyebrow text-gold-400/80 mb-1">
+            Groq API Key <span class="text-parchment-200/30">（留空 = 保持不变）</span>
           </div>
           <input
             v-model="sttForm.apiKey"
             type="password"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="gsk_..."
             autocomplete="off"
           />
@@ -337,29 +353,31 @@ onMounted(() => {
 
       <!-- 访问码管理 -->
       <div class="card space-y-3">
-        <div class="font-semibold">🎟 访问码管理</div>
-        <div class="text-xs text-zinc-500">
+        <div class="font-serif font-semibold text-parchment">🎟 访问码管理</div>
+        <div class="text-xs text-parchment-200/50">
           生成访问码分发给用户，持码用户可使用共享池。原码只显示一次，之后只存哈希。
         </div>
 
         <!-- 生成 -->
         <div class="flex gap-2 flex-wrap items-end">
           <label class="block">
-            <div class="text-xs text-zinc-400 mb-1">数量</div>
+            <div class="eyebrow text-gold-400/80 mb-1">数量</div>
             <input
               v-model.number="newCodeCount"
               type="number"
               min="1"
               max="50"
-              class="w-20 bg-zinc-900 border border-zinc-700 rounded p-1 text-sm"
+              class="w-20 rounded p-1 text-sm text-parchment focus:outline-none"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             />
           </label>
           <label class="block flex-1 min-w-[120px]">
-            <div class="text-xs text-zinc-400 mb-1">备注</div>
+            <div class="eyebrow text-gold-400/80 mb-1">备注</div>
             <input
               v-model="newCodeNote"
               type="text"
-              class="w-full bg-zinc-900 border border-zinc-700 rounded p-1 text-sm"
+              class="w-full rounded p-1 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
               placeholder="如：老王"
             />
           </label>
@@ -367,33 +385,34 @@ onMounted(() => {
         </div>
 
         <!-- 刚生成的码（原码只此一次） -->
-        <div v-if="generatedCodes.length" class="bg-zinc-950 rounded p-2 space-y-1">
+        <div v-if="generatedCodes.length" class="rounded p-2 space-y-1" style="background: rgba(5,8,17,0.6);">
           <div class="text-xs text-good-400">✓ 新生成（请复制保存，关闭后不再显示）：</div>
           <div
             v-for="c in generatedCodes"
             :key="c.hash"
             class="text-sm font-mono text-good-300 break-all"
           >
-            {{ c.code }}<span class="text-zinc-600" v-if="c.note"> ({{ c.note }})</span>
+            {{ c.code }}<span class="text-parchment-200/30" v-if="c.note"> ({{ c.note }})</span>
           </div>
         </div>
 
         <!-- 现有码列表 -->
-        <div class="text-xs text-zinc-400 mt-2">现有访问码（{{ codes.length }}）</div>
-        <div v-if="codes.length === 0" class="text-xs text-zinc-600">暂无</div>
+        <div class="eyebrow text-gold-400/70 mt-2">现有访问码（{{ codes.length }}）</div>
+        <div v-if="codes.length === 0" class="text-xs text-parchment-200/30">暂无</div>
         <div v-else class="space-y-1">
           <div
             v-for="c in codes"
             :key="c.hash"
-            class="flex items-center justify-between bg-zinc-950 rounded p-2 text-xs"
+            class="flex items-center justify-between rounded p-2 text-xs"
+            style="background: rgba(5,8,17,0.6);"
           >
             <div class="min-w-0 flex-1">
-              <span class="font-mono text-zinc-500">{{ c.hash.slice(0, 12) }}…</span>
-              <span v-if="c.note" class="text-zinc-400 ml-2">{{ c.note }}</span>
+              <span class="font-mono text-parchment-200/40">{{ c.hash.slice(0, 12) }}…</span>
+              <span v-if="c.note" class="text-parchment-200/60 ml-2">{{ c.note }}</span>
               <span v-if="!c.enabled" class="text-red-400 ml-2">已撤销</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-zinc-600">{{
+              <span class="text-parchment-200/30">{{
                 new Date(c.createdAt).toLocaleDateString()
               }}</span>
               <button
@@ -409,7 +428,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <RouterLink to="/" class="block text-center text-xs text-zinc-500">
+    <RouterLink to="/" class="block text-center text-xs text-parchment-200/40">
       ← 返回对局
     </RouterLink>
   </div>

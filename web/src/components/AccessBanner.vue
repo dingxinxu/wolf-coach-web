@@ -38,17 +38,19 @@ function logout() {
 </script>
 
 <template>
-  <!-- 未解锁：输码 -->
+  <!-- 未解锁：输码（血色条） -->
   <div
     v-if="!isAuthorized()"
-    class="bg-wolf-900/50 border-b border-wolf-700/40 px-4 py-2 text-sm flex items-center gap-2"
+    class="px-4 py-2 text-sm flex items-center gap-2"
+    style="background: linear-gradient(90deg, rgba(74,2,2,0.5) 0%, rgba(5,8,17,0.9) 100%); border-bottom: 1px solid rgba(139,0,0,0.5);"
   >
     <span class="text-wolf-300 shrink-0">🔒 访问码</span>
     <input
       v-model="code"
       type="text"
       placeholder="输入访问码解锁共享池"
-      class="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-wolf-500"
+      class="flex-1 min-w-0 bg-night-900 border rounded px-2 py-1 text-xs text-parchment focus:outline-none placeholder:text-parchment-200/30"
+      style="border-color: rgba(212,175,55,0.25);"
       :disabled="checking"
       @keyup.enter="submit"
     />
@@ -59,14 +61,15 @@ function logout() {
     >
       {{ checking ? '...' : '解锁' }}
     </button>
-    <span v-if="error" class="text-red-400 text-xs shrink-0">{{ error }}</span>
+    <span v-if="error" class="text-wolf-400 text-xs shrink-0">{{ error }}</span>
   </div>
-  <!-- 已解锁：状态 + 退出 -->
+  <!-- 已解锁：状态 + 退出（钢蓝条） -->
   <div
     v-else
-    class="bg-good-900/20 border-b border-good-700/30 px-4 py-1.5 text-xs flex items-center justify-between"
+    class="px-4 py-1.5 text-xs flex items-center justify-between"
+    style="background: linear-gradient(90deg, rgba(74,111,165,0.18) 0%, rgba(5,8,17,0.9) 100%); border-bottom: 1px solid rgba(74,111,165,0.35);"
   >
-    <span class="text-good-400">✓ 已解锁共享池</span>
-    <button class="text-zinc-500 hover:text-zinc-300" @click="logout">退出</button>
+    <span class="text-steel-500">✓ 已解锁共享池</span>
+    <button class="text-parchment-200/50 hover:text-parchment" @click="logout">退出</button>
   </div>
 </template>

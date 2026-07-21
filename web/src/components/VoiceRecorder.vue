@@ -92,15 +92,18 @@ onBeforeUnmount(() => {
   <div class="flex items-center gap-2">
     <button
       v-if="supported"
+      :style="
+        state === 'recording'
+          ? 'background: linear-gradient(180deg,#c41e3a 0%,#8b0000 100%); border:1px solid rgba(212,175,55,0.5); color:#f4e8c1;'
+          : state === 'paused'
+          ? 'background: linear-gradient(180deg,#92651a 0%,#5a3d0e 100%); border:1px solid rgba(212,175,55,0.4); color:#f4e8c1;'
+          : state === 'transcribing'
+          ? 'background: rgba(51,65,85,0.6); border:1px solid rgba(212,175,55,0.25); color:#cdb885;'
+          : 'background: linear-gradient(180deg,#1e293b 0%,#0e1422 100%); border:1px solid rgba(212,175,55,0.3); color:#f4e8c1;'
+      "
       :class="[
         'px-3 py-1.5 rounded-xl text-sm font-medium transition active:scale-95 flex items-center gap-2',
-        state === 'recording'
-          ? 'bg-wolf-600 text-white rec-pulse'
-          : state === 'paused'
-          ? 'bg-amber-600/80 text-white'
-          : state === 'transcribing'
-          ? 'bg-zinc-700 text-zinc-300'
-          : 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
+        state === 'recording' ? 'rec-pulse' : '',
       ]"
       :disabled="state === 'transcribing'"
       @click="toggle"
@@ -132,13 +135,13 @@ onBeforeUnmount(() => {
 
     <button
       v-if="state === 'recording' || state === 'paused'"
-      class="btn-ghost text-xs text-zinc-400"
+      class="btn-ghost text-xs text-parchment-200/50"
       @click="cancel"
     >
       取消
     </button>
 
-    <span v-if="!supported" class="text-xs text-zinc-500">
+    <span v-if="!supported" class="text-xs text-parchment-200/40">
       🎙 当前浏览器不支持录音
     </span>
 

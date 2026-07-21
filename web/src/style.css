@@ -9,13 +9,13 @@ body,
   height: 100vh;
   height: 100dvh;
   margin: 0;
-  /* 夜色径向渐变：左上微红月光，右下深紫，纯黑底 */
+  /* 午夜墨蓝底：左上血月光晕、右下深靛、纯墨底（替换中性黑） */
   background:
-    radial-gradient(circle at 0% 0%, rgba(127, 29, 29, 0.18) 0%, transparent 45%),
-    radial-gradient(circle at 100% 100%, rgba(30, 27, 75, 0.15) 0%, transparent 50%),
-    #0a0a0a;
+    radial-gradient(circle at 12% 0%, rgba(139, 0, 0, 0.22) 0%, transparent 40%),
+    radial-gradient(circle at 88% 100%, rgba(74, 111, 165, 0.10) 0%, transparent 45%),
+    #050811;
   background-attachment: fixed;
-  color: #f5f5f5;
+  color: #f4e8c1;
   font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -29,41 +29,72 @@ body,
     @apply px-4 py-2 rounded-xl font-medium transition active:scale-95 disabled:opacity-40 disabled:active:scale-100;
   }
   .btn-primary {
-    @apply btn bg-wolf-600 hover:bg-wolf-500 text-white shadow-lg shadow-wolf-900/30;
+    @apply btn text-parchment shadow-lg shadow-blood-900/40;
+    background: linear-gradient(180deg, #c41e3a 0%, #8b0000 100%);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, #dc2626 0%, #a00000 100%);
   }
   .btn-secondary {
-    @apply btn bg-zinc-800 hover:bg-zinc-700 text-zinc-100;
+    @apply btn text-parchment-200;
+    background: linear-gradient(180deg, #1e293b 0%, #0e1422 100%);
+    border: 1px solid rgba(212, 175, 55, 0.25);
+  }
+  .btn-secondary:hover {
+    background: linear-gradient(180deg, #334155 0%, #111827 100%);
   }
   .btn-ghost {
-    @apply btn hover:bg-zinc-800/60 text-zinc-300;
+    @apply btn text-parchment-200/80 hover:text-parchment hover:bg-night-700/40;
   }
 
+  /* 卡片：墨蓝渐变 + 古金细边 + 极轻内高光（替代 zinc 灰） */
   .card {
-    @apply bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-4 backdrop-blur-sm shadow-lg shadow-black/20;
+    @apply rounded-2xl p-4 backdrop-blur-sm;
+    background: linear-gradient(180deg, rgba(17, 24, 39, 0.85) 0%, rgba(10, 14, 26, 0.85) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.18);
+    box-shadow:
+      inset 0 1px 0 0 rgba(212, 175, 55, 0.08),
+      0 8px 24px -8px rgba(0, 0, 0, 0.6);
   }
 
   .chip {
     @apply inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition active:scale-95;
   }
   .chip-on {
-    @apply chip bg-wolf-600 border-wolf-600 text-white shadow-md shadow-wolf-900/40;
+    @apply chip text-parchment;
+    background: linear-gradient(180deg, #c41e3a 0%, #8b0000 100%);
+    border-color: rgba(212, 175, 55, 0.5);
+    box-shadow: 0 0 12px -2px rgba(220, 38, 38, 0.5);
   }
   .chip-off {
-    @apply chip bg-zinc-900/80 border-zinc-700 text-zinc-300 hover:border-zinc-600;
+    @apply chip bg-night-850/80 text-parchment-200/70;
+    border-color: rgba(212, 175, 55, 0.2);
+  }
+  .chip-off:hover {
+    border-color: rgba(212, 175, 55, 0.45);
   }
 
-  /* 座位网格卡片 */
+  /* 座位网格卡片：圆桌座位感 */
   .seat {
     @apply aspect-square rounded-xl border-2 flex flex-col items-center justify-center text-lg font-semibold transition active:scale-95 select-none;
   }
   .seat-alive {
-    @apply bg-zinc-900/80 border-zinc-700 text-zinc-100;
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(10, 14, 26, 0.8) 100%);
+    border-color: rgba(212, 175, 55, 0.22);
+    color: #f4e8c1;
   }
   .seat-dead {
-    @apply bg-zinc-950 border-zinc-800 text-zinc-600 line-through opacity-50;
+    background: rgba(74, 2, 2, 0.4);
+    border-color: rgba(139, 0, 0, 0.5);
+    color: #8b0000;
+    text-decoration: line-through;
+    opacity: 0.55;
   }
+  /* "我"的座位：古金描边 + 微光 */
   .seat-me {
-    @apply ring-2 ring-wolf-500 ring-offset-2 ring-offset-zinc-950;
+    border-color: #d4af37 !important;
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.3), 0 0 14px -2px rgba(212, 175, 55, 0.45);
   }
 
   /* 情绪标签颜色（AnalysisPanel 玩家情绪表内） */
@@ -90,8 +121,93 @@ body,
   top: 0.25rem;
   bottom: 0.25rem;
   width: 3px;
-  background: linear-gradient(180deg, #dc2626 0%, #7f1d1d 100%);
+  background: linear-gradient(180deg, #d4af37 0%, #8b0000 100%);
   border-radius: 2px;
+}
+/* 教练分析正文：羊皮卷色 */
+.prose-invert p,
+.prose-invert li {
+  color: #e8d9a8;
+}
+.prose-invert strong {
+  color: #f4e8c1;
+}
+.prose-invert code {
+  background: rgba(212, 175, 55, 0.12);
+  color: #e8c87a;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.prose-invert table th {
+  background: rgba(139, 0, 0, 0.25);
+  color: #e8c87a;
+  border-color: rgba(212, 175, 55, 0.25) !important;
+}
+.prose-invert table td {
+  border-color: rgba(212, 175, 55, 0.15) !important;
+}
+
+/* === 血月：signature 元素（仅页头用） === */
+.blood-moon {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 35%, #f87171 0%, #c41e3a 45%, #8b0000 80%, #4a0202 100%);
+  box-shadow:
+    0 0 12px 1px rgba(220, 38, 38, 0.6),
+    0 0 22px 4px rgba(139, 0, 0, 0.4),
+    inset 0 0 6px 1px rgba(74, 2, 2, 0.6);
+  animation: moon-glow 4s ease-in-out infinite;
+}
+@keyframes moon-glow {
+  0%, 100% { box-shadow: 0 0 12px 1px rgba(220, 38, 38, 0.55), 0 0 22px 4px rgba(139, 0, 0, 0.35), inset 0 0 6px 1px rgba(74, 2, 2, 0.6); }
+  50%      { box-shadow: 0 0 16px 2px rgba(220, 38, 38, 0.75), 0 0 30px 6px rgba(139, 0, 0, 0.5),  inset 0 0 6px 1px rgba(74, 2, 2, 0.6); }
+}
+
+/* tarot/卷轴风卡片：金色四角装饰（用于分析面板等关键卡） */
+.card-tarot {
+  position: relative;
+}
+.card-tarot::before,
+.card-tarot::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  pointer-events: none;
+}
+.card-tarot::before {
+  top: 6px; left: 6px;
+  border-right: none; border-bottom: none;
+}
+.card-tarot::after {
+  bottom: 6px; right: 6px;
+  border-left: none; border-top: none;
+}
+
+/* 狼眼脉冲（分析 CTA idle 时金边微脉冲） */
+.eye-pulse {
+  animation: eye-pulse 2.4s ease-in-out infinite;
+}
+@keyframes eye-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0), inset 0 0 0 1px rgba(212, 175, 55, 0.35); }
+  50%      { box-shadow: 0 0 16px -2px rgba(212, 175, 55, 0.5), inset 0 0 0 1px rgba(212, 175, 55, 0.7); }
+}
+
+/* 金色发丝分隔线 */
+.rule-gold {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 175, 55, 0.4) 50%, transparent 100%);
+}
+
+/* eyebrow 小标签：tracking + 古金 */
+.eyebrow {
+  letter-spacing: 0.08em;
+  text-transform: none;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 /* 隐藏滚动条但可滚动 */
@@ -108,7 +224,7 @@ body,
   content: '▊';
   display: inline-block;
   margin-left: 2px;
-  color: #dc2626;
+  color: #d4af37;
   animation: blink 1s steps(2) infinite;
 }
 @keyframes blink {
@@ -136,4 +252,12 @@ body,
 /* 防止 iOS 输入框聚焦时页面缩放（字号 ≥16px） */
 input, textarea, select {
   font-size: 16px;
+}
+
+/* reduced motion：关闭装饰性动画，保留功能动画 */
+@media (prefers-reduced-motion: reduce) {
+  .blood-moon,
+  .eye-pulse {
+    animation: none;
+  }
 }

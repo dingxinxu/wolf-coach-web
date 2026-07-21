@@ -15,12 +15,16 @@ const activePath = computed(() => route.path);
 <template>
   <div class="min-h-full flex flex-col max-w-3xl mx-auto">
     <header
-      class="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80 backdrop-blur-md sticky top-0 z-10"
-      style="background: linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.75) 100%);"
+      class="flex items-center justify-between px-4 py-3 backdrop-blur-md sticky top-0 z-10 border-b"
+      style="background: linear-gradient(180deg, rgba(5,8,17,0.96) 0%, rgba(5,8,17,0.82) 100%); border-color: rgba(212,175,55,0.2);"
     >
-      <RouterLink to="/" class="flex items-center gap-2 font-bold active:scale-95 transition">
-        <span class="text-2xl drop-shadow">🐺</span>
-        <span class="text-lg tracking-wide">狼人杀教练</span>
+      <RouterLink to="/" class="flex items-center gap-2.5 active:scale-95 transition">
+        <!-- 血月：signature 元素（纯 CSS） -->
+        <span class="blood-moon shrink-0" aria-hidden="true"></span>
+        <span class="flex flex-col leading-none">
+          <span class="font-serif text-lg tracking-[0.12em] text-parchment" style="text-shadow: 0 0 10px rgba(139,0,0,0.5);">狼人杀教练</span>
+          <span class="text-[9px] text-gold-400/60 mt-0.5 tracking-[0.25em] uppercase">Werewolf Coach</span>
+        </span>
       </RouterLink>
       <nav class="flex items-center gap-1 text-sm">
         <RouterLink
@@ -30,9 +34,10 @@ const activePath = computed(() => route.path);
           :class="[
             'px-3 py-1.5 rounded-lg transition active:scale-95',
             activePath === item.to
-              ? 'bg-wolf-600/20 text-wolf-400 border border-wolf-700/50'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50',
+              ? 'text-gold-300 border'
+              : 'text-parchment-200/60 hover:text-parchment hover:bg-night-700/40 border border-transparent',
           ]"
+          :style="activePath === item.to ? 'background: rgba(139,0,0,0.25); border-color: rgba(212,175,55,0.5);' : ''"
         >
           <span class="mr-1">{{ item.icon }}</span>{{ item.label }}
         </RouterLink>

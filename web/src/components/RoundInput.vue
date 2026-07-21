@@ -121,46 +121,46 @@ function isHardReady() {
         @click="expanded.night = !expanded.night"
       >
         <div>
-          <div class="font-semibold flex items-center gap-2">
+          <div class="font-serif font-semibold flex items-center gap-2 text-parchment">
             <span class="text-wolf-400">🔴 硬必需</span> 夜晚报告
           </div>
-          <div class="text-xs text-zinc-500 mt-0.5">
+          <div class="text-xs text-parchment-200/50 mt-0.5">
             {{ r.deaths.length ? `出局: ${r.deaths.join(', ')}` : '无人出局 / 未标记' }}
           </div>
         </div>
-        <div class="text-2xl text-zinc-500">{{ expanded.night ? '⌄' : '›' }}</div>
+        <div class="text-2xl text-gold-400/60">{{ expanded.night ? '⌄' : '›' }}</div>
       </button>
 
       <div v-if="expanded.night" class="mt-3 space-y-3">
         <div>
-          <div class="text-sm text-zinc-400 mb-2">昨晚出局（点击座位）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">昨晚出局（点击座位）</div>
           <div class="grid grid-cols-6 gap-2">
             <button
               v-for="p in game.players"
               :key="p.seat"
-              :class="[
-                'aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition',
+              class="aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition"
+              :style="
                 r.deaths.includes(p.seat)
-                  ? 'bg-wolf-700 border-wolf-600 text-white line-through'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-200',
-                p.isMe ? 'ring-1 ring-wolf-500' : '',
-              ]"
+                  ? 'background: linear-gradient(180deg,#6b0000 0%,#4a0202 100%); border-color: #8b0000; color:#f4e8c1; text-decoration: line-through;'
+                  : 'background: linear-gradient(180deg,rgba(30,41,59,0.7) 0%,rgba(10,14,26,0.8) 100%); border-color: rgba(212,175,55,0.22); color:#e8d9a8;'
+              "
               @click="toggleDeath(p.seat)"
             >
               {{ p.seat }}
             </button>
           </div>
-          <div class="text-xs text-zinc-500 mt-1">全部不选 = 昨晚无人出局</div>
+          <div class="text-xs text-parchment-200/40 mt-1">全部不选 = 昨晚无人出局</div>
         </div>
 
         <div>
-          <div class="text-sm text-zinc-400 mb-2">
+          <div class="eyebrow text-gold-400/80 mb-2">
             我（{{ game.setup.myRole }}）夜间技能使用
           </div>
           <textarea
             v-model="r.mySkill"
             rows="2"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-3 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             :placeholder="{
               预言家: '例：验了 4 号，金水',
               女巫: '例：解药救了 5 号（被刀），未撒毒',
@@ -181,10 +181,10 @@ function isHardReady() {
         @click="expanded.captain = !expanded.captain"
       >
         <div>
-          <div class="font-semibold flex items-center gap-2">
-            <span class="text-purple-400">🟣 第1轮</span> 上警环节
+          <div class="font-serif font-semibold flex items-center gap-2 text-parchment">
+            <span style="color:#c9a961;">🟣 第1轮</span> 上警环节
           </div>
-          <div class="text-xs text-zinc-500 mt-0.5">
+          <div class="text-xs text-parchment-200/50 mt-0.5">
             {{
               r.captain.elected
                 ? `警长：${r.captain.elected}号`
@@ -194,24 +194,23 @@ function isHardReady() {
             }}
           </div>
         </div>
-        <div class="text-2xl text-zinc-500">{{ expanded.captain ? '⌄' : '›' }}</div>
+        <div class="text-2xl text-gold-400/60">{{ expanded.captain ? '⌄' : '›' }}</div>
       </button>
 
       <div v-if="expanded.captain" class="mt-3 space-y-3">
         <!-- 上警玩家 -->
         <div>
-          <div class="text-sm text-zinc-400 mb-2">上警玩家（点击切换）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">上警玩家（点击切换）</div>
           <div class="grid grid-cols-6 gap-2">
             <button
               v-for="p in game.players"
               :key="p.seat"
-              :class="[
-                'aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition',
+              class="aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition"
+              :style="
                 r.captain.runners.includes(p.seat)
-                  ? 'bg-purple-700 border-purple-500 text-white'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-200',
-                p.isMe ? 'ring-1 ring-wolf-500' : '',
-              ]"
+                  ? 'background: linear-gradient(180deg,#6b4a1f 0%,#3a2810 100%); border-color: #c9a961; color:#f4e8c1;'
+                  : 'background: linear-gradient(180deg,rgba(30,41,59,0.7) 0%,rgba(10,14,26,0.8) 100%); border-color: rgba(212,175,55,0.22); color:#e8d9a8;'
+              "
               @click="toggleArr(r.captain.runners, p.seat)"
             >
               {{ p.seat }}
@@ -221,17 +220,17 @@ function isHardReady() {
 
         <!-- 退水玩家 -->
         <div v-if="r.captain.runners.length">
-          <div class="text-sm text-zinc-400 mb-2">退水玩家（从上警名单中点出退水）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">退水玩家（从上警名单中点出退水）</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="seat in r.captain.runners"
               :key="`wd-${seat}`"
-              :class="[
-                'px-3 py-1.5 rounded-lg border text-sm transition',
+              class="px-3 py-1.5 rounded-lg border text-sm transition"
+              :style="
                 r.captain.withdrawn.includes(seat)
-                  ? 'bg-zinc-700 border-zinc-500 text-zinc-300 line-through'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-200 hover:border-zinc-500',
-              ]"
+                  ? 'background: rgba(51,65,85,0.6); border-color: rgba(212,175,55,0.35); color:#8b9099; text-decoration: line-through;'
+                  : 'background: rgba(10,14,26,0.6); border-color: rgba(212,175,55,0.22); color:#e8d9a8;'
+              "
               @click="toggleArr(r.captain.withdrawn, seat)"
             >
               {{ seat }}号{{ r.captain.withdrawn.includes(seat) ? ' · 退水' : '' }}
@@ -241,17 +240,19 @@ function isHardReady() {
 
         <!-- 警上发言 -->
         <div>
-          <div class="text-sm text-zinc-400 mb-2">警上发言（按需添加）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">警上发言（按需添加）</div>
           <div class="space-y-2">
             <div
               v-for="(s, i) in r.captain.speeches"
               :key="`cap-${i}`"
-              class="bg-zinc-950 rounded-lg p-2 space-y-2"
+              class="rounded-lg p-2 space-y-2"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.12);"
             >
               <div class="flex items-center gap-2">
                 <select
                   v-model="s.seat"
-                  class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm"
+                  class="rounded px-2 py-1 text-sm text-parchment focus:outline-none"
+                  style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
                 >
                   <option :value="null">座位</option>
                   <option v-for="p in game.players" :key="p.seat" :value="p.seat">
@@ -273,7 +274,8 @@ function isHardReady() {
               <textarea
                 v-model="s.text"
                 rows="3"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-purple-500"
+                class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+                style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
                 placeholder="可直接输入，或点【开始录音】让 Whisper 转写"
               />
             </div>
@@ -285,17 +287,17 @@ function isHardReady() {
 
         <!-- 当选警长 -->
         <div>
-          <div class="text-sm text-zinc-400 mb-2">当选警长（单选，可空）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">当选警长（单选，可空）</div>
           <div class="grid grid-cols-6 gap-2">
             <button
               v-for="p in game.players"
               :key="`el-${p.seat}`"
-              :class="[
-                'aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition',
+              class="aspect-square rounded-lg border-2 text-sm font-semibold active:scale-95 transition"
+              :style="
                 r.captain.elected === p.seat
-                  ? 'bg-gold-500 border-gold-400 text-white'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-200',
-              ]"
+                  ? 'background: linear-gradient(180deg,#e8c87a 0%,#c9a961 100%); border-color: #d4af37; color:#4a0202;'
+                  : 'background: linear-gradient(180deg,rgba(30,41,59,0.7) 0%,rgba(10,14,26,0.8) 100%); border-color: rgba(212,175,55,0.22); color:#e8d9a8;'
+              "
               @click="pickElected(p.seat)"
             >
               {{ p.seat }}
@@ -305,11 +307,12 @@ function isHardReady() {
 
         <!-- 警徽流 -->
         <div>
-          <div class="text-sm text-zinc-400 mb-2">警徽流（可选，预言家常用）</div>
+          <div class="eyebrow text-gold-400/80 mb-2">警徽流（可选，预言家常用）</div>
           <textarea
             v-model="r.captain.badgeFlow"
             rows="2"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm focus:outline-none focus:border-purple-500"
+            class="w-full rounded-lg p-3 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="例：金水留 7 号，查杀留 3 号"
           />
         </div>
@@ -323,26 +326,28 @@ function isHardReady() {
         @click="expanded.speech = !expanded.speech"
       >
         <div>
-          <div class="font-semibold flex items-center gap-2">
-            <span class="text-gold-500">🟡 软必需</span> 白天发言
+          <div class="font-serif font-semibold flex items-center gap-2 text-parchment">
+            <span class="text-gold-400">🟡 软必需</span> 白天发言
           </div>
-          <div class="text-xs text-zinc-500 mt-0.5">
+          <div class="text-xs text-parchment-200/50 mt-0.5">
             {{ r.speeches.length ? `${r.speeches.length} 条记录` : '可跳过，分析时在【追问】补问' }}
           </div>
         </div>
-        <div class="text-2xl text-zinc-500">{{ expanded.speech ? '⌄' : '›' }}</div>
+        <div class="text-2xl text-gold-400/60">{{ expanded.speech ? '⌄' : '›' }}</div>
       </button>
 
       <div v-if="expanded.speech" class="mt-3 space-y-2">
         <div
           v-for="(s, i) in r.speeches"
           :key="i"
-          class="bg-zinc-950 rounded-lg p-2 space-y-2"
+          class="rounded-lg p-2 space-y-2"
+          style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.12);"
         >
           <div class="flex items-center gap-2">
             <select
               v-model="s.seat"
-              class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm"
+              class="rounded px-2 py-1 text-sm text-parchment focus:outline-none"
+              style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
             >
               <option :value="null">座位</option>
               <option v-for="p in game.players" :key="p.seat" :value="p.seat">
@@ -364,14 +369,15 @@ function isHardReady() {
           <textarea
             v-model="s.text"
             rows="3"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="可直接输入，或点【开始录音】让 Whisper 转写"
           />
         </div>
         <button class="btn-secondary w-full text-sm" @click="addSpeech">
           + 添加发言
         </button>
-        <div class="text-xs text-zinc-500">
+        <div class="text-xs text-parchment-200/40">
           💡 选座位 → 点【开始录音】录该玩家发言 → 自动转写到文本框。
         </div>
       </div>
@@ -384,14 +390,14 @@ function isHardReady() {
         @click="expanded.vote = !expanded.vote"
       >
         <div>
-          <div class="font-semibold flex items-center gap-2">
+          <div class="font-serif font-semibold flex items-center gap-2 text-parchment">
             <span class="text-wolf-400">🔴 硬必需</span> 票型
           </div>
-          <div class="text-xs text-zinc-500 mt-0.5">
+          <div class="text-xs text-parchment-200/50 mt-0.5">
             {{ r.votes.length ? `${r.votes.length} 票` : '未记录' }}
           </div>
         </div>
-        <div class="text-2xl text-zinc-500">{{ expanded.vote ? '⌄' : '›' }}</div>
+        <div class="text-2xl text-gold-400/60">{{ expanded.vote ? '⌄' : '›' }}</div>
       </button>
 
       <div v-if="expanded.vote" class="mt-3 space-y-2">
@@ -402,17 +408,19 @@ function isHardReady() {
         >
           <select
             v-model="v.from"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm flex-1"
+            class="rounded px-2 py-1 text-sm text-parchment focus:outline-none flex-1"
+            style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
           >
             <option :value="null">投票人</option>
             <option v-for="p in game.players" :key="p.seat" :value="p.seat">
               {{ p.seat }}号{{ p.isMe ? '（我）' : '' }}
             </option>
           </select>
-          <span class="text-zinc-500">→</span>
+          <span class="text-wolf-400">→</span>
           <select
             v-model="v.to"
-            class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm flex-1"
+            class="rounded px-2 py-1 text-sm text-parchment focus:outline-none flex-1"
+            style="background: rgba(10,14,26,0.8); border: 1px solid rgba(212,175,55,0.22);"
           >
             <option :value="null">弃票</option>
             <option v-for="p in game.players" :key="p.seat" :value="p.seat">

@@ -96,11 +96,11 @@ function applyPreset(p) {
 
 <template>
   <div class="space-y-4">
-    <h1 class="text-2xl font-bold">设置</h1>
+    <h1 class="font-serif text-2xl font-bold text-parchment">设置</h1>
 
     <!-- Key 模式 -->
     <div class="card">
-      <div class="font-semibold mb-3">API Key 来源</div>
+      <div class="font-serif font-semibold mb-3 text-parchment">API Key 来源</div>
       <div class="grid grid-cols-2 gap-2">
         <button
           :class="settings.keyMode === 'user' ? 'chip-on' : 'chip-off'"
@@ -126,26 +126,28 @@ function applyPreset(p) {
       </div>
       <div
         v-if="settings.keyMode === 'user'"
-        class="mt-3 text-xs text-zinc-500 bg-zinc-950 rounded p-2"
+        class="mt-3 text-xs text-parchment-200/50 rounded p-2"
+        style="background: rgba(5,8,17,0.6);"
       >
         💡 你的 Key 只存在本机 localStorage，每次请求透传到 Worker，Worker 不存储。
       </div>
       <div
         v-else
-        class="mt-3 text-xs text-zinc-500 bg-zinc-950 rounded p-2"
+        class="mt-3 text-xs text-parchment-200/50 rounded p-2"
+        style="background: rgba(5,8,17,0.6);"
       >
-        💡 走管理员在 <code class="bg-zinc-800 px-1 rounded">/admin</code> 维护的共享池。
+        💡 走管理员在 <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">/admin</code> 维护的共享池。
       </div>
     </div>
 
     <!-- 用户自带 Key 的详细配置 -->
     <div v-if="settings.keyMode === 'user'" class="space-y-3">
       <div class="card">
-        <div class="font-semibold mb-3">LLM 配置（OpenAI 兼容格式）</div>
+        <div class="font-serif font-semibold mb-3 text-parchment">LLM 配置（OpenAI 兼容格式）</div>
 
         <!-- 快速预设 -->
         <div class="mb-3">
-          <div class="text-xs text-zinc-500 mb-2">快速预设</div>
+          <div class="eyebrow text-gold-400/70 mb-2">快速预设</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="p in PRESETS"
@@ -159,27 +161,29 @@ function applyPreset(p) {
         </div>
 
         <label class="block mt-3">
-          <div class="text-sm text-zinc-400 mb-1">API Base URL</div>
+          <div class="eyebrow text-gold-400/80 mb-1">API Base URL</div>
           <input
             v-model="settings.userLLM.baseUrl"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="https://api.deepseek.com/v1"
           />
         </label>
 
         <label class="block mt-3">
-          <div class="text-sm text-zinc-400 mb-1">模型 ID</div>
+          <div class="eyebrow text-gold-400/80 mb-1">模型 ID</div>
           <input
             v-model="settings.userLLM.model"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="deepseek-chat"
           />
         </label>
 
         <div class="mt-3">
-          <div class="text-sm text-zinc-400 mb-1">思考强度</div>
+          <div class="eyebrow text-gold-400/80 mb-1">思考强度</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="opt in REASONING_OPTIONS"
@@ -190,18 +194,19 @@ function applyPreset(p) {
               {{ opt.label }}
             </button>
           </div>
-          <div class="text-xs text-zinc-500 mt-1">
+          <div class="text-xs text-parchment-200/40 mt-1">
             仅对支持 reasoning_effort 的模型生效（DeepSeek-R1 / OpenAI o 系列）
           </div>
         </div>
 
         <label class="block mt-3">
-          <div class="text-sm text-zinc-400 mb-1">API Key</div>
+          <div class="eyebrow text-gold-400/80 mb-1">API Key</div>
           <div class="flex gap-2">
             <input
               v-model="settings.userLLM.apiKey"
               :type="showKey ? 'text' : 'password'"
-              class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+              class="flex-1 rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
               placeholder="sk-..."
               autocomplete="off"
             />
@@ -215,8 +220,8 @@ function applyPreset(p) {
 
     <!-- STT 配置 -->
     <div class="card">
-      <div class="font-semibold mb-1">🎙 语音转写（Groq Whisper）</div>
-      <div class="text-xs text-zinc-500 mb-3">
+      <div class="font-serif font-semibold mb-1 text-parchment">🎙 语音转写（Groq Whisper）</div>
+      <div class="text-xs text-parchment-200/50 mb-3">
         发言录音后自动转写到文本框。Key 与 LLM 独立（Groq 和 LLM 通常不同提供商）。
       </div>
 
@@ -246,30 +251,33 @@ function applyPreset(p) {
 
       <div v-if="settings.sttKeyMode === 'user'" class="space-y-3">
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Base URL</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Base URL</div>
           <input
             v-model="settings.userSTT.baseUrl"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="https://api.groq.com/openai/v1"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Model</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Model</div>
           <input
             v-model="settings.userSTT.model"
             type="text"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+            class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+            style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
             placeholder="whisper-large-v3"
           />
         </label>
         <label class="block">
-          <div class="text-sm text-zinc-400 mb-1">Groq API Key</div>
+          <div class="eyebrow text-gold-400/80 mb-1">Groq API Key</div>
           <div class="flex gap-2">
             <input
               v-model="settings.userSTT.apiKey"
               :type="showSttKey ? 'text' : 'password'"
-              class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+              class="flex-1 rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+              style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
               placeholder="gsk_..."
               autocomplete="off"
             />
@@ -277,7 +285,7 @@ function applyPreset(p) {
               {{ showSttKey ? '🙈' : '👁' }}
             </button>
           </div>
-          <div class="text-xs text-zinc-500 mt-1">
+          <div class="text-xs text-parchment-200/40 mt-1">
             申请：console.groq.com → API Keys（免费）
           </div>
         </label>
@@ -285,23 +293,25 @@ function applyPreset(p) {
 
       <div
         v-if="settings.sttKeyMode === 'admin-pool'"
-        class="text-xs text-zinc-500 bg-zinc-950 rounded p-2"
+        class="text-xs text-parchment-200/50 rounded p-2"
+        style="background: rgba(5,8,17,0.6);"
       >
-        💡 走管理员在 <code class="bg-zinc-800 px-1 rounded">/admin</code> 维护的 STT 共享池。
+        💡 走管理员在 <code style="background: rgba(212,175,55,0.12); color:#e8c87a; padding:0.1em 0.35em; border-radius:4px;">/admin</code> 维护的 STT 共享池。
       </div>
     </div>
 
     <!-- Worker URL（保留旧块） -->
     <div class="card">
       <label class="block">
-        <div class="text-sm text-zinc-400 mb-1">Worker URL（可选）</div>
+        <div class="eyebrow text-gold-400/80 mb-1">Worker URL（可选）</div>
         <input
           v-model="settings.workerUrl"
           type="text"
-          class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm focus:outline-none focus:border-wolf-500"
+          class="w-full rounded-lg p-2 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+          style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
           placeholder="留空 = 同 origin（默认）；自部署可填 https://xxx.workers.dev"
         />
-        <div class="text-xs text-zinc-500 mt-1">
+        <div class="text-xs text-parchment-200/40 mt-1">
           默认前端和 Worker 同 origin 部署，留空即可。
         </div>
       </label>
@@ -321,10 +331,10 @@ function applyPreset(p) {
     <!-- 玩家档案库管理 -->
     <div class="card">
       <div class="flex items-center justify-between mb-2">
-        <div class="font-semibold">👥 玩家档案库</div>
-        <div class="text-xs text-zinc-500">共 {{ roster.players.length }} 位</div>
+        <div class="font-serif font-semibold text-parchment">👥 玩家档案库</div>
+        <div class="text-xs text-gold-400/60">共 {{ roster.players.length }} 位</div>
       </div>
-      <div class="text-xs text-zinc-500 mb-3">
+      <div class="text-xs text-parchment-200/50 mb-3">
         跨局保留熟人玩家头像与风格标签。开新局时可在 SETUP 关联到座位。
       </div>
       <div class="flex gap-2 flex-wrap">
@@ -345,7 +355,7 @@ function applyPreset(p) {
 
     <!-- 管理员入口（隐藏在底部） -->
     <div class="text-center pt-4">
-      <RouterLink to="/admin" class="text-xs text-zinc-600 hover:text-zinc-400">
+      <RouterLink to="/admin" class="text-xs text-parchment-200/40 hover:text-gold-400">
         管理员入口 →
       </RouterLink>
     </div>

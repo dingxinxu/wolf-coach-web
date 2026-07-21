@@ -185,8 +185,8 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
   <div v-if="game.phase === 'setup'" class="space-y-4">
     <div class="card flex items-center justify-between">
       <div>
-        <div class="font-semibold">新对局</div>
-        <div class="text-xs text-zinc-500 mt-0.5">还没开始，先配置本局信息</div>
+        <div class="font-serif font-bold text-parchment text-lg">新对局</div>
+        <div class="text-xs text-parchment-200/50 mt-0.5">还没开始，先配置本局信息</div>
       </div>
       <button class="btn-ghost text-sm" @click="fileInput?.click()">
         📥 导入旧局
@@ -206,20 +206,20 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
   <!-- 游戏中 -->
   <div v-else class="space-y-4 pb-32">
     <!-- 头部 -->
-    <div class="card !bg-gradient-to-br from-wolf-900/30 to-zinc-900/70">
+    <div class="card" style="background: linear-gradient(135deg, rgba(74,2,2,0.35) 0%, rgba(10,14,26,0.9) 70%);">
       <div class="flex items-center justify-between">
         <div>
-          <div class="font-bold flex items-center gap-2">
-            <span class="text-wolf-400">●</span>
+          <div class="font-serif font-bold flex items-center gap-2 text-parchment text-lg">
+            <span class="text-wolf-400 drop-shadow" style="text-shadow:0 0 8px rgba(220,38,38,0.7);">●</span>
             <span>{{ phaseLabel }}</span>
           </div>
-          <div class="text-xs text-zinc-400 mt-1">
-            存活 <span class="text-good-500 font-semibold">{{ aliveCount }}</span> / {{ preset.total }}
+          <div class="text-xs text-parchment-200/60 mt-1">
+            存活 <span class="text-steel-500 font-semibold">{{ aliveCount }}</span> / {{ preset.total }}
           </div>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn-ghost text-xs" @click="showTermFaq = true">
-            📖 术语/FAQ
+            📖 术语
           </button>
           <button class="btn-ghost text-xs" @click="exportGame">📤 导出</button>
           <button
@@ -239,9 +239,13 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
     <RoundInput v-if="game.phase === 'playing'" />
 
     <!-- 操作按钮 -->
-    <div class="fixed bottom-0 left-0 right-0 max-w-3xl mx-auto bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] flex gap-2 shadow-2xl shadow-black/40">
+    <div
+      class="fixed bottom-0 left-0 right-0 max-w-3xl mx-auto backdrop-blur-md p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] flex gap-2 shadow-2xl"
+      style="background: rgba(5,8,17,0.96); border-top: 1px solid rgba(212,175,55,0.25); box-shadow: 0 -8px 24px -8px rgba(0,0,0,0.6);"
+    >
       <button
-        class="btn-primary flex-1 shadow-wolf-900/40"
+        class="btn-primary flex-1 text-base"
+        :class="{ 'eye-pulse': !loading }"
         :disabled="loading"
         @click="analyze(false)"
       >
@@ -275,14 +279,15 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
 
     <!-- 历史回合折叠 -->
     <div v-if="game.rounds.length > 1" class="card">
-      <div class="text-sm font-semibold text-zinc-400 mb-2">历史回合</div>
+      <div class="text-sm font-semibold text-parchment-200/70 mb-2">历史回合</div>
       <div class="space-y-2">
         <details
           v-for="rr in game.rounds.filter(x => x.round !== game.currentRound).reverse()"
           :key="rr.round"
-          class="bg-zinc-950 rounded-lg p-2"
+          class="rounded-lg p-2"
+          style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.12);"
         >
-          <summary class="cursor-pointer text-sm">
+          <summary class="cursor-pointer text-sm text-parchment-200/80">
             第 {{ rr.round }} 轮 · 出局 {{ rr.deaths.length ? rr.deaths.join(',') : '无' }}
           </summary>
           <div

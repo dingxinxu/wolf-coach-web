@@ -36,8 +36,8 @@ function click(p) {
 
 <template>
   <div>
-    <div class="text-xs text-zinc-500 mb-2">
-      点击切换存活 · 红框是你的座位 · 头像来自玩家档案库
+    <div class="eyebrow text-gold-400/60 mb-2">
+      点击切换存活 · <span class="text-gold-400">金框是你的座位</span> · 头像来自玩家档案库
     </div>
     <div class="grid grid-cols-6 gap-2">
       <button
@@ -49,12 +49,12 @@ function click(p) {
         <!-- 有绑定的座位：头像 + 座位号 -->
         <template v-if="boundPlayer(p.seat)">
           <div class="text-2xl leading-none">{{ boundPlayer(p.seat).avatar }}</div>
-          <div class="text-[10px] text-zinc-400 mt-0.5">#{{ p.seat }}</div>
+          <div class="text-[10px] text-gold-400/70 mt-0.5">#{{ p.seat }}</div>
         </template>
         <!-- 我的座位 -->
         <template v-else-if="p.isMe">
           <div class="text-xl">🙋</div>
-          <div class="text-[10px] text-wolf-400 mt-0.5">我 #{{ p.seat }}</div>
+          <div class="text-[10px] text-gold-300 mt-0.5">我 #{{ p.seat }}</div>
         </template>
         <!-- 未绑定 + 已出局 -->
         <template v-else-if="!p.alive">

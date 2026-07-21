@@ -62,7 +62,7 @@ const sourceLabel = computed(() => {
     case 'admin-pool':
       return { text: '🏛 共享池', cls: 'text-gold-400' };
     case 'fallback':
-      return { text: '🛡 兜底', cls: 'text-zinc-400' };
+      return { text: '🛡 兜底', cls: 'text-parchment-200/50' };
     default:
       return null;
   }
@@ -70,18 +70,26 @@ const sourceLabel = computed(() => {
 </script>
 
 <template>
-  <div class="card min-h-[200px]">
+  <div class="card card-tarot min-h-[200px]">
     <div class="flex items-center justify-between mb-3">
-      <div class="font-semibold flex items-center gap-2">
-        <span class="text-wolf-400">🐺</span>
+      <div class="font-serif font-semibold flex items-center gap-2 text-parchment">
+        <span class="text-wolf-400 drop-shadow" style="text-shadow:0 0 8px rgba(220,38,38,0.6);">🐺</span>
         <span>教练分析</span>
       </div>
-      <div v-if="sourceLabel" :class="['text-xs px-2 py-0.5 rounded-full bg-zinc-800/50', sourceLabel.cls]">
+      <div
+        v-if="sourceLabel"
+        :class="['text-xs px-2 py-0.5 rounded-full', sourceLabel.cls]"
+        style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.2);"
+      >
         {{ sourceLabel.text }}
       </div>
     </div>
 
-    <div v-if="error" class="text-wolf-300 text-sm bg-wolf-900/40 border border-wolf-800/50 rounded-lg p-3">
+    <div
+      v-if="error"
+      class="text-wolf-300 text-sm rounded-lg p-3"
+      style="background: rgba(74,2,2,0.35); border: 1px solid rgba(139,0,0,0.5);"
+    >
       ⚠️ {{ error }}
     </div>
 
@@ -94,13 +102,13 @@ const sourceLabel = computed(() => {
 
     <div
       v-else-if="loading"
-      class="text-zinc-500 text-sm flex items-center gap-2 py-4 justify-center"
+      class="text-parchment-200/50 text-sm flex items-center gap-2 py-4 justify-center"
     >
-      <span class="text-wolf-400 animate-pulse text-lg">🐺</span>
+      <span class="text-wolf-400 eye-pulse inline-block rounded-full px-1 text-lg">🐺</span>
       <span class="animate-pulse">教练正在思考…</span>
     </div>
 
-    <div v-else class="text-zinc-500 text-sm text-center py-4">
+    <div v-else class="text-parchment-200/40 text-sm text-center py-4">
       填完上方信息后点击「让教练分析」
     </div>
   </div>
