@@ -12,27 +12,48 @@
  */
 import { reactive, watch } from 'vue';
 
+// GitHub Pages 部署在子路径（/wolf-coach-web/），public/ 下的资源引用需带 base 前缀
+const BASE = import.meta.env.BASE_URL || '/';
+const icon = (name) => `${BASE}role-icons/${name}.svg`;
+
 const STORAGE_KEY = 'wolf-coach-game-v1';
 
 /** 板子预设（同 SKILL.md 主流板子表） */
 export const BOARDS = {
-  '9预女猎': { total: 9, gods: '预言家/女巫/猎人', civs: 3, wolves: 3, hasCaptain: true },
-  '12预女猎守': { total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true },
-  '12预女猎白': { total: 12, gods: '预言家/女巫/猎人/白痴', civs: 4, wolves: 4, hasCaptain: true },
+  '9预女猎': {
+    total: 9, gods: '预言家/女巫/猎人', civs: 3, wolves: 3, hasCaptain: true,
+    cover: icon('board-9'),
+  },
+  '12预女猎守': {
+    total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true,
+    cover: icon('board-12-guard'),
+  },
+  '12预女猎白': {
+    total: 12, gods: '预言家/女巫/猎人/白痴', civs: 4, wolves: 4, hasCaptain: true,
+    cover: icon('board-12-idiot'),
+  },
 };
 
+/**
+ * 身份表（含图标 + 主题色）。
+ * key 仍是中文 label（向后兼容：myRole 比较仍按 label），其他字段只用于渲染。
+ * accent 用 CSS filter 的预设 key，在 SetupWizard 里映射成具体 filter 字符串。
+ */
 export const ROLES = [
-  '预言家',
-  '女巫',
-  '猎人',
-  '守卫',
-  '白痴',
-  '平民',
-  '狼人',
-  '狼王',
-  '白狼王',
-  '其他',
+  { label: '预言家', icon: icon('seer'),       accent: 'gold' },
+  { label: '女巫',   icon: icon('witch'),       accent: 'purple' },
+  { label: '猎人',   icon: icon('hunter'),      accent: 'blood' },
+  { label: '守卫',   icon: icon('guard'),       accent: 'steel' },
+  { label: '白痴',   icon: icon('idiot'),       accent: 'parchment' },
+  { label: '平民',   icon: icon('civilian'),    accent: 'steel' },
+  { label: '狼人',   icon: icon('werewolf'),    accent: 'blood' },
+  { label: '狼王',   icon: icon('wolf-king'),   accent: 'blood' },
+  { label: '白狼王', icon: icon('white-wolf'),  accent: 'parchment' },
+  { label: '其他',   icon: '',                  accent: 'parchment' },
 ];
+
+/** 按中文 label 取角色配置（向后兼容老代码） */
+export const ROLE_BY_LABEL = Object.fromEntries(ROLES.map((r) => [r.label, r]));
 
 export const RULE_VERSIONS = [
   { key: 'witch_full_vision', label: '女巫全程看刀口', default: true },

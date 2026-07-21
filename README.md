@@ -190,3 +190,13 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api -> 8787
 ## 📄 许可
 
 MIT
+
+## 🎨 素材归因
+
+`web/public/role-icons/` 下的 SVG 来自 [game-icons.net](https://game-icons.net)，
+按 [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) 许可使用。
+
+- 作者：Lorc（除 `idiot.svg`、`civilian.svg`、`board-12-idiot.svg` 由 Delapouite 创作）
+- 项目内已通过 CSS `filter` 重新着色以匹配血月主题
+- 原始素材：https://game-icons.net
+
