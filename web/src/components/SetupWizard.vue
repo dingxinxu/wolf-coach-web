@@ -3,9 +3,14 @@
  * SETUP 采集向导。
  *
  * Q7 决策 A：全卡片选择。三步：
- *   Step 1 板子（卡片，含背景插画）
- *   Step 2 身份（卡片，含角色图标 + 主题色）
+ *   Step 1 板子（卡片，含背景插画）+ 自定义板子入口
+ *   Step 2 身份（卡片，含角色图标 + 主题色，按板子 roles 过滤防矛盾组合）
  *   Step 3 座位 + 熟人备注 + 规则版本（多选）
+ *
+ * P1-6：
+ *   - 加 3 个狼王板（12狼王/12白狼王/9狼王）
+ *   - 自定义板子入口（textarea 描述）
+ *   - 身份选择按 BOARDS[].roles 过滤（自定义板子不过滤）
  */
 import { ref, computed } from 'vue';
 import { BOARDS, ROLES, RULE_VERSIONS, startGame } from '../stores/game.js';
@@ -16,6 +21,7 @@ const emit = defineEmits(['done']);
 const step = ref(1);
 
 const board = ref('');
+const boardDesc = ref(''); // P1-6：自定义板子描述
 const myRole = ref('');
 const mySeat = ref(null);
 const seatBindings = ref({}); // { seat: playerId }
@@ -27,7 +33,31 @@ const ruleVersion = ref(
 const playerPickerRef = ref(null);
 
 const boardList = Object.keys(BOARDS);
-const preset = computed(() => (board.value ? BOARDS[board.value] : null));
+const preset = computed(() => (board.value && !isCustom.value ? BOARDS[board.value] : null));
+const isCustom = computed(() => board.value.startsWith('自定义：'));
+
+/**
+ * P1-6：Step 2 可选身份列表。
+ * - 标准板子：按 BOARDS[board].roles 过滤
+ * - 自定义板子：显示全部 ROLES（用户自己负责）
+ */
+const availableRoles = computed(() => {
+  if (isCustom.value) return ROLES;
+  if (!preset.value?.roles) return ROLES;
+  return ROLES.filter((r) => preset.value.roles.includes(r.label));
+});
+
+/**
+ * P1-6：Step 3 座位网格的总人数。
+ * - 标准板子：preset.total
+ * - 自定义板子：从 boardDesc 解析（兜底 12）
+ */
+const customTotal = computed(() => {
+  if (!isCustom.value) return preset.value?.total || 12;
+  const m = boardDesc.value.match(/(\d+)\s*人/);
+  const n = m ? Number(m[1]) : 12;
+  return n >= 6 && n <= 18 ? n : 12;
+});
 
 /**
  * 按 accent 给出选中态的色板（边框/背景/glow/文字/标记点）。
@@ -66,6 +96,13 @@ const ACCENT_HEX = {
 
 function pickBoard(b) {
   board.value = b;
+  boardDesc.value = '';
+  step.value = 2;
+}
+
+/** P1-6：选自定义板子 -> 展开描述输入 */
+function pickCustomBoard() {
+  board.value = '自定义：';
   step.value = 2;
 }
 
@@ -85,16 +122,22 @@ function toggleRule(key) {
 
 function confirm() {
   if (!board.value || !myRole.value || !mySeat.value) return;
+  // 自定义板子要求 boardDesc 非空
+  if (isCustom.value && !boardDesc.value.trim()) {
+    alert('请描述自定义板子（人数、神民狼配置、特殊规则）');
+    return;
+  }
   // 合成最终 playerStyles：档案库合成 + 手输
   const fromRoster = playerPickerRef.value?.formatBindings?.() || '';
   const combined = [fromRoster, playerStyles.value].filter(Boolean).join('；');
   startGame({
-    board: board.value,
+    board: isCustom.value ? `自定义：${boardDesc.value.trim().slice(0, 30)}` : board.value,
     myRole: myRole.value,
     mySeat: mySeat.value,
     playerStyles: combined,
     ruleVersion: { ...ruleVersion.value },
     seatBindings: { ...seatBindings.value },
+    boardDesc: isCustom.value ? boardDesc.value.trim() : '',
   });
   emit('done');
 }
@@ -183,6 +226,30 @@ function back() {
             </div>
           </div>
         </button>
+
+        <!-- P1-6：自定义板子入口 -->
+        <button
+          class="relative overflow-hidden text-left active:scale-[0.98] transition"
+          style="
+            border-radius: 14px;
+            border: 1px dashed rgba(212,175,55,0.45);
+            background: linear-gradient(135deg, rgba(30,41,59,0.6) 0%, rgba(10,14,26,0.85) 75%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            min-height: 80px;
+          "
+          @click="pickCustomBoard"
+        >
+          <div class="p-4 flex items-center gap-3">
+            <span class="text-3xl">➕</span>
+            <div>
+              <div class="font-serif text-lg font-bold text-parchment">自定义板子</div>
+              <div class="text-xs text-parchment-200/60 mt-0.5">
+                狼美人 / 守墓人石像鬼 / 丘比特 / 非标准人数 等罕见板
+              </div>
+            </div>
+            <span class="ml-auto text-gold-400 text-base">›</span>
+          </div>
+        </button>
       </div>
     </div>
 
@@ -192,10 +259,26 @@ function back() {
         <h2 class="font-serif text-xl font-bold text-parchment">你的身份（{{ board }}）</h2>
         <button class="btn-ghost text-sm" @click="back">← 返回</button>
       </div>
+
+      <!-- P1-6：自定义板子描述输入 -->
+      <div v-if="isCustom" class="rounded-lg p-3" style="background: rgba(74,2,2,0.25); border: 1px solid rgba(212,175,55,0.35);">
+        <div class="eyebrow text-gold-400/80 mb-2">📋 描述本局板子</div>
+        <textarea
+          v-model="boardDesc"
+          rows="3"
+          class="w-full rounded-lg p-3 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+          style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
+          placeholder="例：12 人局，4 神（预言家/女巫/猎人/守卫），4 民，4 狼（含 1 狼美人，狼美人不能自刀）"
+        />
+        <div class="text-xs text-parchment-200/40 mt-1">
+          这段描述会作为 system prompt 上下文喂给教练 LLM，写清楚人数和配置
+        </div>
+      </div>
+
       <!-- 角色卡网格：每张卡用网易立绘作主体 -->
       <div class="grid grid-cols-3 gap-2">
         <button
-          v-for="r in ROLES"
+          v-for="r in availableRoles"
           :key="r.label"
           :style="{
             borderWidth: '2px',
@@ -268,11 +351,16 @@ function back() {
         <button class="btn-ghost text-sm" @click="back">← 返回</button>
       </div>
 
+      <!-- P1-6：自定义板子时显示当前描述（只读） -->
+      <div v-if="isCustom && boardDesc" class="rounded-lg p-2 text-xs text-parchment-200/70" style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.15);">
+        📋 {{ boardDesc }}
+      </div>
+
       <div>
         <div class="eyebrow text-gold-400/80 mb-2">你的座位号（点击）</div>
         <div class="grid grid-cols-6 gap-2">
           <button
-            v-for="n in preset.total"
+            v-for="n in customTotal"
             :key="n"
             class="aspect-square rounded-lg border-2 font-semibold active:scale-95 transition"
             :style="
@@ -306,7 +394,7 @@ function back() {
         <PlayerPicker
           ref="playerPickerRef"
           v-model:bindings="seatBindings"
-          :total="preset.total"
+          :total="customTotal"
           :my-seat="mySeat"
         />
       </div>

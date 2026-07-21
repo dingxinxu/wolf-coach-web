@@ -13,8 +13,9 @@
 import { reactive, watch } from 'vue';
 
 // GitHub Pages 部署在子路径（/wolf-coach-web/），public/ 下的资源引用需带 base 前缀
+// P1-8：PNG -> webp（体积降 76%，原 PNG 保留作版权证据）
 const BASE = import.meta.env.BASE_URL || '/';
-const icon = (name) => `${BASE}role-art/${name}.png`;
+const icon = (name) => `${BASE}role-art/${name}.webp`;
 
 const STORAGE_KEY = 'wolf-coach-game-v1';
 
@@ -23,14 +24,34 @@ export const BOARDS = {
   '9预女猎': {
     total: 9, gods: '预言家/女巫/猎人', civs: 3, wolves: 3, hasCaptain: true,
     cover: icon('seer'),     // 板子封面取代表性神职立绘
+    // 该板子可能出现的身份（用于 Step 2 过滤，防矛盾组合）
+    roles: ['预言家', '女巫', '猎人', '平民', '狼人'],
   },
   '12预女猎守': {
     total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true,
     cover: icon('guard'),
+    roles: ['预言家', '女巫', '猎人', '守卫', '平民', '狼人'],
   },
   '12预女猎白': {
     total: 12, gods: '预言家/女巫/猎人/白痴', civs: 4, wolves: 4, hasCaptain: true,
     cover: icon('idiot'),
+    roles: ['预言家', '女巫', '猎人', '白痴', '平民', '狼人'],
+  },
+  // P1-6：扩展 3 个狼王板（国内竞技常见）
+  '12狼王预女猎守': {
+    total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true,
+    cover: icon('wolf-king'),
+    roles: ['预言家', '女巫', '猎人', '守卫', '平民', '狼人', '狼王'],
+  },
+  '12白狼王预女猎守': {
+    total: 12, gods: '预言家/女巫/猎人/守卫', civs: 4, wolves: 4, hasCaptain: true,
+    cover: icon('white-wolf'),
+    roles: ['预言家', '女巫', '猎人', '守卫', '平民', '狼人', '白狼王'],
+  },
+  '9狼王预女猎': {
+    total: 9, gods: '预言家/女巫/猎人', civs: 3, wolves: 3, hasCaptain: true,
+    cover: icon('wolf-king'),
+    roles: ['预言家', '女巫', '猎人', '平民', '狼人', '狼王'],
   },
 };
 
@@ -133,13 +154,26 @@ watch(
 );
 
 /** 初始化一局新游戏（SETUP 完成） */
-export function startGame({ board, myRole, mySeat, playerStyles, ruleVersion, seatBindings = {} }) {
-  const preset = BOARDS[board];
-  if (!preset) throw new Error('未知板子：' + board);
+export function startGame({ board, myRole, mySeat, playerStyles, ruleVersion, seatBindings = {}, boardDesc = '' }) {
+  // P1-6：支持自定义板子（board 以"自定义："开头时用 boardDesc 描述）
+  const isCustom = typeof board === 'string' && board.startsWith('自定义：');
+  const preset = isCustom ? null : BOARDS[board];
+  if (!isCustom && !preset) throw new Error('未知板子：' + board);
+
+  // 自定义板子从 boardDesc 解析人数（兜底 12）
+  let total;
+  if (isCustom) {
+    const m = boardDesc.match(/(\d+)\s*人/);
+    total = m ? Number(m[1]) : 12;
+    if (total < 6 || total > 18) total = 12;
+  } else {
+    total = preset.total;
+  }
 
   game.setup = { board, myRole, mySeat, playerStyles, ruleVersion };
+  if (isCustom) game.setup.boardDesc = boardDesc;
   game.seatBindings = seatBindings;
-  game.players = Array.from({ length: preset.total }, (_, i) => ({
+  game.players = Array.from({ length: total }, (_, i) => ({
     seat: i + 1,
     alive: true,
     isMe: i + 1 === mySeat,
@@ -190,13 +224,32 @@ export function importGame(file) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        if (!data.setup || !data.rounds) throw new Error('文件格式不正确');
+    const data = JSON.parse(reader.result);
+    if (!data.setup || !data.rounds) throw new Error('文件格式不正确');
+    // 未知板子校验：导入后游戏无法正常初始化 players
+    // P1-6：自定义板子（"自定义："开头）放行
+    if (data.setup.board && !BOARDS[data.setup.board] && !data.setup.board.startsWith('自定义：')) {
+      throw new Error(`未知板子：${data.setup.board}（请确认导出文件来自本应用）`);
+    }
         // 老存档兼容：补 captain 字段
         for (const r of data.rounds) {
           if (!r.captain) r.captain = { runners: [], withdrawn: [], speeches: [], elected: null, badgeFlow: '' };
         }
-        Object.assign(game, data);
+        // 白名单字段过滤（防 __proto__ 等污染）
+        const safeFields = ['phase', 'setup', 'seatBindings', 'players', 'rounds', 'currentRound'];
+        const safeSetupFields = ['board', 'myRole', 'mySeat', 'playerStyles', 'ruleVersion', 'boardDesc'];
+        const safe = {};
+        for (const k of safeFields) {
+          if (k in data) safe[k] = data[k];
+        }
+        if (safe.setup && typeof safe.setup === 'object') {
+          const safeSetup = {};
+          for (const k of safeSetupFields) {
+            if (k in safe.setup) safeSetup[k] = safe.setup[k];
+          }
+          safe.setup = safeSetup;
+        }
+        Object.assign(game, safe);
         resolve();
       } catch (e) {
         reject(e);
@@ -210,4 +263,60 @@ export function importGame(file) {
 /** 结束游戏（进入复盘阶段） */
 export function endGame() {
   game.phase = 'ended';
+}
+
+/**
+ * P2-18：判断当前是否允许编辑 setup。
+ * 守卫：仅在第 1 轮且当前轮未生成 analysis 时可改，避免破坏已有推理上下文。
+ */
+export function canEditSetup() {
+  if (game.phase !== 'playing') return false;
+  if (game.currentRound !== 1) return false;
+  const r = game.rounds.find((x) => x.round === game.currentRound);
+  return !r?.analysis;
+}
+
+/**
+ * P2-18：更新 setup（保留 rounds，若人数变了则 confirm 后重建 players）。
+ * @param {Object} patch { board?, myRole?, mySeat?, playerStyles?, ruleVersion?, boardDesc? }
+ */
+export function updateSetup(patch) {
+  const oldTotal = game.players.length;
+  const newBoard = patch.board ?? game.setup.board;
+  const isCustom = typeof newBoard === 'string' && newBoard.startsWith('自定义：');
+  let newTotal = oldTotal;
+  if (!isCustom && BOARDS[newBoard]) {
+    newTotal = BOARDS[newBoard].total;
+  } else if (isCustom && patch.boardDesc) {
+    const m = patch.boardDesc.match(/(\d+)\s*人/);
+    newTotal = m ? Number(m[1]) : oldTotal;
+    if (newTotal < 6 || newTotal > 18) newTotal = oldTotal;
+  }
+
+  // 人数变化 -> confirm 后重建 players（rounds 数据保留但可能不再匹配座位）
+  if (newTotal !== oldTotal) {
+    if (!confirm(`板子人数从 ${oldTotal} 变为 ${newTotal}，将清空当前轮录入（历史回合保留）。继续？`)) {
+      return false;
+    }
+    // 清掉当前轮（避免座位号错位）
+    game.rounds = [freshRound(1)];
+    game.currentRound = 1;
+  }
+
+  // 应用 setup patch
+  Object.assign(game.setup, patch);
+  // 重建 players（保留 mySeat 标记）
+  if (newTotal !== oldTotal) {
+    const mySeat = patch.mySeat ?? game.setup.mySeat;
+    game.players = Array.from({ length: newTotal }, (_, i) => ({
+      seat: i + 1,
+      alive: true,
+      isMe: i + 1 === mySeat,
+      notes: '',
+    }));
+  } else if (patch.mySeat !== undefined) {
+    // 人数没变但 mySeat 改了
+    game.players = game.players.map((p) => ({ ...p, isMe: p.seat === patch.mySeat }));
+  }
+  return true;
 }
