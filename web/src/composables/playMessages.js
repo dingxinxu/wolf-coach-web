@@ -7,6 +7,28 @@
 import { game } from '../stores/game.js';
 
 /**
+ * C3：提取历轮教练分析的关键结论作为摘要（避免把整段 analysis 原文塞进 user 消息）。
+ * 只摘每轮的前 ~200 字（通常含态势结论 + 关键判断），超出截断。
+ * 当前轮 + 上一轮不压缩（在 renderRoundDetail 里完整输出）。
+ */
+function buildPastAnalysesDigest(pastRounds) {
+  // 只压缩比上一轮更早的轮次（上一轮原文已在 renderRoundDetail 之外通过其他途径传给 LLM，
+  // 实际上 buildMessages 只 render 当前轮；这里把所有 pastRounds 的 analysis 都做摘要）
+  const withAnalysis = pastRounds.filter((x) => x.analysis && x.analysis.trim());
+  if (!withAnalysis.length) return '';
+  const lines = ['## 历轮分析结论摘要（教练之前给出的判断，供本轮参考）'];
+  for (const x of withAnalysis) {
+    const text = x.analysis.trim();
+    // 截取前 200 字 + 省略号标记
+    const digest = text.length > 200 ? text.slice(0, 200) + '…（已截断）' : text;
+    // 压掉换行让摘要紧凑
+    const compact = digest.replace(/\s+/g, ' ');
+    lines.push(`- R${x.round}：${compact}`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * 构造历史已知事实摘要（紧凑版，供常规分析用）。
  * @param {Array} pastRounds 历史轮次（不含当前轮）
  * @returns {string}
@@ -165,11 +187,17 @@ export function buildMessages({ preset, currentRoundObj, forReview = false }) {
       renderRoundDetail(round, lines);
     }
   } else {
-    // A4：常规分析 = 历史已知事实（紧凑摘要）+ 当前轮完整原文
+    // A4 + C3：常规分析 = 历史已知事实摘要 + 历轮分析结论摘要 + 当前轮完整原文
     const pastRounds = game.rounds.filter((x) => x.round !== game.currentRound);
     const facts = buildKnownFacts(pastRounds);
     if (facts) {
       lines.push(facts);
+      lines.push('');
+    }
+    // C3：历轮分析结论摘要（让 LLM 知道之前推出了什么，无需重读历史轮次）
+    const digest = buildPastAnalysesDigest(pastRounds);
+    if (digest) {
+      lines.push(digest);
       lines.push('');
     }
     lines.push(`## 本轮报告（第 ${game.currentRound} 轮）`);
