@@ -33,6 +33,12 @@ export const MAX_INPUT_CHARS = 60000;
 export const ADMIN_FAIL_LIMIT = 5;
 export const ADMIN_LOCK_MS = 10 * 60 * 1000;
 
+// P1-7：verify-code 公开端点 IP 日限，防高频枚举访问码（非原子，半公开场景够用）
+export const VERIFY_DAILY_LIMIT = 50;
+
+// P1-9：SSE 透传 stall 超时（与前端 llm.js STALL_MS 一致），上游无 chunk 超此时长则注入 error
+export const SSE_STALL_MS = 30000;
+
 /**
  * C3：检查 messages 总长度是否超阈值（纯函数，供 handleChat 和测试共用）。
  * @param {Array<{content?: string}>} messages
@@ -84,6 +90,20 @@ export async function decryptApiKey(cipher, env) {
 export async function hashAccessCode(code) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * 常量时间字符串比较（P1-8）：两侧 SHA-256 后比较 hex（长度固定 64，无早退），
+ * 消除 admin 密码 === 比较的理论时序面。任一为空直接返回 false。
+ */
+export async function constantTimeEqual(a, b) {
+  if (!a || !b) return false;
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(a)),
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(b)),
+  ]);
+  const toHex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return toHex(ha) === toHex(hb);
 }
 
 function base64ToBytes(b64) {
@@ -316,10 +336,32 @@ async function handleChat(request, env, ctx) {
     // 上游 ok，此时才扣访问码额度（P0-2：避免扣费却不服务）
     if (accessGuard) await bumpUsage(accessGuard.codeHash, accessGuard.entry, env);
 
-    // 流式：透传 SSE
+    // 流式：透传 SSE（P1-9：TransformStream 包裹，30s 无 chunk 注入 error 后关闭，防上游挂起耗 Worker）
     if (stream) {
-      return cors(request, env, 
-        new Response(upstream.body, {
+      const encoder = new TextEncoder();
+      let stallTimer = null;
+      let streamController = null;
+      const clearStall = () => { if (stallTimer) clearTimeout(stallTimer); stallTimer = null; };
+      const resetStall = () => {
+        clearStall();
+        stallTimer = setTimeout(() => {
+          // 超时：注入 SSE error 事件并关闭流
+          try {
+            streamController?.enqueue(encoder.encode(`data:{"error":"upstream_stall","detail":"上游 ${SSE_STALL_MS / 1000}s 无响应"}\n\n`));
+            streamController?.close();
+          } catch { /* 流已关闭，忽略 */ }
+        }, SSE_STALL_MS);
+      };
+      const { readable, writable } = new TransformStream({
+        start(controller) { streamController = controller; resetStall(); },
+        transform(chunk, controller) { resetStall(); controller.enqueue(chunk); },
+        flush() { clearStall(); },
+        cancel() { clearStall(); },
+      });
+      // pipeTo 异步执行，不阻塞响应返回；upstream 中断/完成时清理 timer
+      upstream.body.pipeTo(writable).catch(clearStall).finally(clearStall);
+      return cors(request, env,
+        new Response(readable, {
           headers: {
             'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache, no-transform',
@@ -341,8 +383,23 @@ async function handleChat(request, env, ctx) {
 
 /**
  * 验证访问码有效性。无需鉴权（公开端点，仅查访问码是否存在于 KV 且 enabled 且未过期）。
+ *
+ * P1-7：按 CF-Connecting-IP 每日限流（VERIFY_DAILY_LIMIT），防高频枚举探测码。
+ * 计数非原子（read-modify-write），半公开场景作"业余枚举防御"够用。
  */
 async function handleVerifyCode(request, env) {
+  // IP 日限检查
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const today = new Date().toISOString().slice(0, 10);
+  const vkey = `verify_count:${ip}`;
+  let vc = await env.LLM_POOL?.get(vkey, { type: 'json' }).catch(() => null);
+  if (!vc || vc.day !== today) vc = { day: today, count: 0 };
+  if (vc.count >= VERIFY_DAILY_LIMIT) {
+    return cors(request, env, json({ error: 'rate_limit_exceeded', detail: '验证请求过多，请明日再试', limit: VERIFY_DAILY_LIMIT }, 429));
+  }
+  vc.count += 1;
+  await env.LLM_POOL?.put(vkey, JSON.stringify(vc)).catch(() => {});
+
   let body;
   try {
     body = await request.json();
@@ -506,7 +563,7 @@ export async function requireAdmin(request, env) {
   }
 
   const key = request.headers.get('X-Admin-Key');
-  if (!key || key !== env.ADMIN_PASSWORD) {
+  if (!(await constantTimeEqual(key, env.ADMIN_PASSWORD))) {
     // 记一次失败
     const count = (failEntry?.count || 0) + 1;
     const next = { count, lockedUntil: count >= ADMIN_FAIL_LIMIT ? Date.now() + ADMIN_LOCK_MS : 0 };
@@ -552,7 +609,7 @@ export async function validateAccessCode(request, env) {
     return { ok: false, response: cors(request, env, json({ error: 'access_code_expired', detail: '访问码已过期，请联系管理员' }, 403)) };
   }
 
-  // 每日用量计数（按 UTC 日期重置）-- 仅校验是否超限，不自增
+  // 每日用量计数（按 UTC 日期重置）—— 仅校验是否超限，不自增
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   if (!entry.usage || entry.usage.day !== today) {
     entry.usage = { day: today, count: 0 };

@@ -14,6 +14,14 @@ const path = require('path');
 
 const ART_DIR = path.resolve(__dirname, '../web/public/role-art');
 
+// P1-12：开头检测 cwebp 是否安装，缺失直接 fail-fast（否则循环全部 catch 后静默 exit 0）
+try {
+  execSync('which cwebp', { stdio: 'pipe' });
+} catch {
+  console.error('❌ 未找到 cwebp。macOS 安装：brew install webp');
+  process.exit(1);
+}
+
 if (!fs.existsSync(ART_DIR)) {
   console.error(`❌ 目录不存在: ${ART_DIR}`);
   process.exit(1);
@@ -27,6 +35,7 @@ if (pngs.length === 0) {
 
 let okCount = 0;
 let skipCount = 0;
+let failCount = 0;
 for (const png of pngs) {
   const src = path.join(ART_DIR, png);
   const dst = path.join(ART_DIR, png.replace(/\.png$/, '.webp'));
@@ -47,8 +56,10 @@ for (const png of pngs) {
     okCount++;
   } catch (e) {
     console.error(`[fail] ${png}: ${e.message}`);
+    failCount++;
   }
 }
 
-console.log(`\n✅ 转换完成：${okCount} 张转 webp，${skipCount} 张跳过`);
+console.log(`\n✅ 转换完成：${okCount} 张转 webp，${skipCount} 张跳过，${failCount} 张失败`);
 console.log(`原 PNG 保留在 ${ART_DIR}（版权证据，勿删）`);
+if (failCount > 0) process.exit(1);

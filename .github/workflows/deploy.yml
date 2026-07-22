@@ -56,6 +56,10 @@ jobs:
         if: failure()
         run: pnpm install
 
+      # 5.5 跑单测（P1-11）：构建前验证，失败阻断部署，防 P0 类回归
+      - name: Run tests
+        run: pnpm test
+
       # 6. 同步技能 md 到 web/public/skill 和 worker/skill
       - name: Sync skill
         run: node scripts/sync-skill.js

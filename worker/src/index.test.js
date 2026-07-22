@@ -19,9 +19,11 @@ import {
   bumpUsage,
   requireAdmin,
   checkInputSize,
+  constantTimeEqual,
   MAX_INPUT_CHARS,
   ADMIN_FAIL_LIMIT,
   ADMIN_LOCK_MS,
+  VERIFY_DAILY_LIMIT,
 } from './index.js';
 
 // P0-6：常量从 index.js import，单一真相源，避免两处硬编码不同步
@@ -489,5 +491,41 @@ describe('D1 · requireAdmin 失败限流', () => {
     });
     const res = await requireAdmin(mockAdminRequest(ADMIN_PASSWORD), env);
     expect(res).toBeNull(); // 锁已过期，密码正确，通过
+  });
+
+  it('P1-8 回归：空 key -> 401（constantTimeEqual 空值边界）', async () => {
+    const env = envWithFails();
+    // key 为 undefined（mockAdminRequest(undefined) 不设头）
+    const res = await requireAdmin(mockAdminRequest(undefined), env);
+    expect(res.status).toBe(401);
+  });
+
+  it('P1-8 回归：ADMIN_PASSWORD 未配置 -> 401（不通过）', async () => {
+    const kv = mockKV({});
+    const env = { LLM_POOL: kv }; // 无 ADMIN_PASSWORD
+    const res = await requireAdmin(mockAdminRequest('anything'), env);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('P1-8 · constantTimeEqual', () => {
+  it('相等字符串 -> true', async () => {
+    expect(await constantTimeEqual('secret', 'secret')).toBe(true);
+  });
+
+  it('不等字符串 -> false', async () => {
+    expect(await constantTimeEqual('secret', 'secreX')).toBe(false);
+  });
+
+  it('任一为空 -> false（不抛错）', async () => {
+    expect(await constantTimeEqual('', 'x')).toBe(false);
+    expect(await constantTimeEqual('x', '')).toBe(false);
+    expect(await constantTimeEqual('', '')).toBe(false);
+    expect(await constantTimeEqual(null, 'x')).toBe(false);
+    expect(await constantTimeEqual('x', undefined)).toBe(false);
+  });
+
+  it('长度不同但哈希后定长比较 -> false', async () => {
+    expect(await constantTimeEqual('a', 'aa')).toBe(false);
   });
 });
