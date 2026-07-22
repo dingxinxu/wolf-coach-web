@@ -12,13 +12,14 @@
  */
 import { settings, buildLLMForRequest, workerBase, isLLMReady } from '../stores/settings.js';
 import { access } from '../stores/access.js';
+import { buildAuthHeaders } from './request.js';
 
 const STALL_TIMEOUT_MS = 30_000; // 30s 无新 chunk 视为超时
 
 /**
  * HTTP 状态码 + 上游错误类型 -> 友好提示。
  */
-function mapUpstreamError(status, detail) {
+export function mapUpstreamError(status, detail) {
   if (status === 401) return 'API Key 失效或余额不足，请到【设置】检查或联系管理员。';
   if (status === 403) {
     if (detail?.includes('access_code_required')) return '需要访问码才能使用共享池，请在顶部输入。';
@@ -58,10 +59,7 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
     stream: true,
   };
 
-  const headers = { 'Content-Type': 'application/json' };
-  if (settings.keyMode === 'admin-pool' && access.accessCode) {
-    headers['X-Access-Code'] = access.accessCode;
-  }
+  const headers = buildAuthHeaders(settings.keyMode, access.accessCode);
 
   // 超时控制：30s 无新 chunk 触发 abort
   const timeoutAbort = new AbortController();

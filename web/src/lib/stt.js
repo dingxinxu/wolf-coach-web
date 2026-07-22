@@ -9,6 +9,7 @@
  */
 import { settings, buildSTTForRequest, workerBase, isSTTReady } from '../stores/settings.js';
 import { access } from '../stores/access.js';
+import { buildAuthHeaders } from './request.js';
 
 const MAX_DURATION_MS = 120 * 1000;
 
@@ -45,6 +46,10 @@ function pickMimeType() {
  *   ...
  *   const { blob, mimeType, durationMs } = await rec.stop();
  */
+// P2-18：全局互斥引用。同一时刻只允许一个 Recorder 持有麦克风，
+// 防止 RoundInput 警上/白天多个 VoiceRecorder 实例并发录音。
+let activeRecorder = null;
+
 export class Recorder {
   constructor() {
     this.stream = null;
@@ -78,6 +83,10 @@ export class Recorder {
     if (!isRecordingSupported()) {
       throw new Error('当前浏览器不支持录音（需要 MediaRecorder API）');
     }
+    // P2-18：若有其它实例正在录音或暂停，抢占式拒绝
+    if (activeRecorder && activeRecorder !== this && (activeRecorder.recording || activeRecorder.paused)) {
+      throw new Error('请先停止当前录音');
+    }
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.mimeType = pickMimeType();
     this.mediaRecorder = new MediaRecorder(this.stream, {
@@ -104,6 +113,7 @@ export class Recorder {
         this._onStop?.();
       };
       this.mediaRecorder.start();
+      activeRecorder = this; // P2-18：登记为当前活跃录音器
 
       // 120s 安全上限（按有效录音时长）：定时检查
       this._timer = setInterval(() => {
@@ -132,6 +142,7 @@ export class Recorder {
     if (!this.recording && !this.paused) return Promise.resolve(null);
     clearInterval(this._timer);
     this._timer = null;
+    if (activeRecorder === this) activeRecorder = null;
     return new Promise((resolve) => {
       this._onStop = resolve;
       this.mediaRecorder.stop();
@@ -143,6 +154,7 @@ export class Recorder {
     clearInterval(this._timer);
     this._timer = null;
     this._onStop = null;
+    if (activeRecorder === this) activeRecorder = null;
     if (this.recording || this.paused) {
       // 标记忽略后续数据
       this.chunks = [];
@@ -198,10 +210,7 @@ export async function transcribe(audio, mimeType) {
     stt: buildSTTForRequest(),
   };
 
-  const headers = { 'Content-Type': 'application/json' };
-  if (settings.sttKeyMode === 'admin-pool' && access.accessCode) {
-    headers['X-Access-Code'] = access.accessCode;
-  }
+  const headers = buildAuthHeaders(settings.sttKeyMode, access.accessCode);
   const resp = await fetch(url, {
     method: 'POST',
     headers,

@@ -10,7 +10,7 @@
  *   - 规则速查 → rules.md
  *   - 策略    → strategy.md（大，只展示章节索引 + 展开）
  */
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { renderMarkdown } from '../lib/md.js';
 
 const emit = defineEmits(['close']);
@@ -21,6 +21,11 @@ const error = ref('');
 const cache = ref({});
 
 const BASE = import.meta.env.BASE_URL;
+
+// P2-17：Esc 关闭 + 锁滚动
+function onKeydown(e) {
+  if (e.key === 'Escape') emit('close');
+}
 
 async function loadMd(name) {
   if (cache.value[name]) return cache.value[name];
@@ -56,7 +61,14 @@ const currentContent = computed(() => {
 const currentHtml = computed(() => renderMarkdown(currentContent.value));
 
 onMounted(async () => {
+  document.addEventListener('keydown', onKeydown);
+  document.body.style.overflow = 'hidden';
   await loadMd('references/glossary.md');
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKeydown);
+  document.body.style.overflow = '';
 });
 
 async function switchTab(t) {
@@ -81,6 +93,9 @@ const tabs = [
     @click.self="emit('close')"
   >
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="术语与规则速查"
       class="rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col"
       style="background: linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(5,8,17,0.98) 100%); border: 1px solid rgba(212,175,55,0.3); box-shadow: 0 0 40px -8px rgba(139,0,0,0.4);"
     >
@@ -95,7 +110,7 @@ const tabs = [
             {{ t.label }}
           </button>
         </div>
-        <button class="btn-ghost" @click="emit('close')">✕</button>
+        <button class="btn-ghost" aria-label="关闭" @click="emit('close')">✕</button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4 no-scrollbar">

@@ -75,6 +75,13 @@ body,
     border-color: rgba(212, 175, 55, 0.45);
   }
 
+  /* P2-14：字段输入统一样式（替代散落的 inline style） */
+  .field-input {
+    @apply w-full rounded-lg p-2 text-sm text-parchment focus:outline-none;
+    background: rgba(5, 8, 17, 0.6);
+    border: 1px solid rgba(212, 175, 55, 0.22);
+  }
+
   /* 座位网格卡片：圆桌座位感 */
   .seat {
     @apply aspect-square rounded-xl border-2 flex flex-col items-center justify-center text-lg font-semibold transition active:scale-95 select-none;
