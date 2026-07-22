@@ -26,7 +26,8 @@ import { loadSkillBundle, buildSystemPrompt } from './skill-loader.js';
 // 因此这里的常量保持模块内私有，不 export；测试通过行为间接验证。
 
 // C3：单次请求 input 字符上限（system + user 合计）。
-// system prompt ~32K + user 侧 ~28K = 60K 字符 ≈ 15K tokens user，防超大 message 烧账单。
+// system prompt ~48K（skill+rules+strategy+glossary+wrapper）+ user 侧 ~12K = 60K 字符。
+// C3 裁剪 strategy 后 system 略降；多轮对话靠 buildMessages 的历史摘要压缩控制 user 侧长度。
 export const MAX_INPUT_CHARS = 60000;
 
 // D1：admin 登录失败限流。连续失败 5 次锁 10 分钟。
@@ -69,6 +70,8 @@ export async function encryptApiKey(plain, env) {
 
 /**
  * AES-GCM 解密 apiKey。
+ * C7：解密失败时记 console.error（而非静默 warn），让运维能从日志发现 KV_ENC_KEY 缺失/错误。
+ *     常见失败原因：env.KV_ENC_KEY 未配置（base64ToBytes('') 抛错）、密钥不匹配、密文损坏。
  */
 export async function decryptApiKey(cipher, env) {
   if (!cipher) return '';
@@ -81,7 +84,14 @@ export async function decryptApiKey(cipher, env) {
     const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
     return new TextDecoder().decode(pt);
   } catch (e) {
-    console.warn('apiKey 解密失败', e);
+    // C7：error 级别 + 明确提示可能原因，便于运维排查
+    const hasKey = !!(env && env.KV_ENC_KEY);
+    console.error(
+      `[decryptApiKey] 失败：${e.message}。` +
+        (hasKey
+          ? 'KV_ENC_KEY 已配置但解密失败（密钥不匹配或密文损坏）。'
+          : '⚠️ KV_ENC_KEY 未配置！admin 后台显示的共享池将无法解密，请求会静默降级到 DEFAULT_LLM_API_KEY。请运行 wrangler secret put KV_ENC_KEY。')
+    );
     return '';
   }
 }
@@ -313,12 +323,13 @@ async function handleChat(request, env, ctx) {
     );
   }
 
-  // Prompt cache 稳定性日志（P1-7）：固定 system prompt 才能命中 DeepSeek/OpenAI prompt cache
-  // 哈希应跨请求一致；若哈希变化说明 system prompt 被无意修改，cache 失效
+  // Prompt cache 稳定性日志（P1-7）：固定 system prompt 才能命中 DeepSeek/OpenAI prompt cache。
+  // C4：不再硬编码 cache_stable=yes（易谎报）；只打 hash 前缀，运维对比跨请求 hash 是否一致。
+  // hash 变化 = skill 内容被改 = cache 失效（预期内的失效，如本次裁剪 strategy 后 hash 必变）。
   if (typeof console !== 'undefined' && console.debug) {
     const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(systemPrompt));
     const hashHex = [...new Uint8Array(hashBuf)].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
-    console.debug(`[chat] system_prompt len=${systemPrompt.length} hash=${hashHex} cache_stable=yes`);
+    console.debug(`[chat] system_prompt len=${systemPrompt.length} hash=${hashHex}`);
   }
 
   try {
@@ -665,8 +676,13 @@ async function handleAdmin(request, env, pathname) {
     if (!active) return cors(request, env, json({ active: null }));
     const plainKey = await decryptApiKey(active.apiKey, env);
     const { apiKey, ...safe } = active;
-    return cors(request, env, 
-      json({ active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) } })
+    // C7：共享池存在 apiKey 但解密返回空（KV_ENC_KEY 缺失/不匹配），暴露给 admin UI
+    const decryptFailed = !!active.apiKey && !plainKey;
+    return cors(request, env,
+      json({
+        active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) },
+        ...(decryptFailed ? { decryptFailed: true, decryptHint: 'KV_ENC_KEY 未配置或不匹配，共享池 apiKey 无法解密' } : {}),
+      })
     );
   }
 
@@ -676,6 +692,22 @@ async function handleAdmin(request, env, pathname) {
     const { baseUrl, model, reasoning, apiKey } = body;
     if (!baseUrl || !model) {
       return cors(request, env, json({ error: 'baseUrl and model required' }, 400));
+    }
+    // C7：若提交了 apiKey 但 KV_ENC_KEY 未配置，拒绝写入并提示
+    // （否则加密会失败/存空值，admin 看到"已配置"但实际从未生效）
+    if (apiKey && !env.KV_ENC_KEY) {
+      return cors(
+        request,
+        env,
+        json(
+          {
+            error: 'kv_enc_key_missing',
+            detail:
+              'KV_ENC_KEY 未配置，无法加密共享池 apiKey。请先运行 wrangler secret put KV_ENC_KEY（base64 编码的 32 字节密钥）。',
+          },
+          400
+        )
+      );
     }
     const prev = (await env.LLM_POOL?.get('active', { type: 'json' })) || {};
     const storedApiKey = apiKey ? await encryptApiKey(apiKey, env) : (prev.apiKey || '');
@@ -698,8 +730,12 @@ async function handleAdmin(request, env, pathname) {
     if (!active) return cors(request, env, json({ active: null }));
     const plainKey = await decryptApiKey(active.apiKey, env);
     const { apiKey, ...safe } = active;
-    return cors(request, env, 
-      json({ active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) } })
+    const decryptFailed = !!active.apiKey && !plainKey;
+    return cors(request, env,
+      json({
+        active: { ...safe, hasKey: !!plainKey, apiKeyMasked: maskKey(plainKey) },
+        ...(decryptFailed ? { decryptFailed: true, decryptHint: 'KV_ENC_KEY 未配置或不匹配，STT 共享池 apiKey 无法解密' } : {}),
+      })
     );
   }
 
@@ -709,6 +745,20 @@ async function handleAdmin(request, env, pathname) {
     const { baseUrl, model, apiKey } = body;
     if (!baseUrl || !model) {
       return cors(request, env, json({ error: 'baseUrl and model required' }, 400));
+    }
+    // C7：与 LLM config 一致，KV_ENC_KEY 缺失时拒绝写入
+    if (apiKey && !env.KV_ENC_KEY) {
+      return cors(
+        request,
+        env,
+        json(
+          {
+            error: 'kv_enc_key_missing',
+            detail: 'KV_ENC_KEY 未配置，无法加密共享池 apiKey。请先运行 wrangler secret put KV_ENC_KEY。',
+          },
+          400
+        )
+      );
     }
     const prev = (await env.LLM_POOL?.get('active_stt', { type: 'json' })) || {};
     const storedApiKey = apiKey ? await encryptApiKey(apiKey, env) : (prev.apiKey || '');
