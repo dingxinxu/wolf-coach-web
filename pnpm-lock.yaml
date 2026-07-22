@@ -50,6 +50,9 @@ importers:
 
   worker:
     devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(jsdom@29.1.1)(terser@5.49.0)
       wrangler:
         specifier: ^3.90.0
         version: 3.114.17

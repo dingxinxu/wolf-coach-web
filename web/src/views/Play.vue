@@ -35,6 +35,7 @@ const keySource = ref('');
 const showTermFaq = ref(false);
 const fileInput = ref(null);
 const showEditSetup = ref(false); // P2-18：编辑 setup 模式
+const showResetModal = ref(false); // F1a：重开确认模态
 
 const r = computed(() => currentRound());
 // P1-6：自定义板子时构造虚拟 preset，让模板不报 NPE
@@ -47,6 +48,129 @@ const preset = computed(() => {
   }
   return null;
 });
+
+/**
+ * A4：把历史轮（不含当前轮）的结构化事实 reduce 成紧凑清单，让教练跨轮能"看见"。
+ *
+ * 抽 4 类字段（决策见 grill Q8）：
+ *   - 累积死亡名单
+ *   - 警长当选 + 警徽流（仅 R1 有）
+ *   - 我的夜间技能历史（验人链 / 用药史 / 守人记录）
+ *   - 历轮票型
+ *
+ * 不抽：历史自由文本发言（r.speeches[].text）——丢失但靠【追问】段补，B1 决策。
+ *
+ * @param {Array} pastRounds 历史轮（不含当前轮）
+ * @returns {string} 渲染好的 markdown 段（含标题），无内容时返回空串
+ */
+function buildKnownFacts(pastRounds) {
+  if (!pastRounds.length) return '';
+  const lines = ['## 历史已知事实（前 ' + pastRounds.length + ' 轮）'];
+
+  // 累积死亡
+  const allDead = [];
+  for (const round of pastRounds) {
+    for (const seat of round.deaths) {
+      if (!allDead.includes(seat)) allDead.push([seat, round.round]);
+    }
+  }
+  if (allDead.length) {
+    lines.push('- 累计出局：' + allDead.map(([s, r]) => `${s}号(R${r})`).join('、'));
+  }
+
+  // 警长 + 警徽流（仅 R1）
+  const r1 = pastRounds.find((x) => x.round === 1);
+  if (r1?.captain) {
+    const cap = r1.captain;
+    if (cap.elected) {
+      let capLine = `- 警长：${cap.elected}号`;
+      if (cap.badgeFlow) capLine += `（警徽流：${cap.badgeFlow}）`;
+      lines.push(capLine);
+    } else if (cap.runners.length) {
+      lines.push('- 警长：未选出（PK / 流局）');
+    }
+  }
+
+  // 我的夜间技能历史
+  const skillHist = pastRounds.filter((x) => x.mySkill && x.mySkill.trim());
+  if (skillHist.length) {
+    lines.push('- 我的夜间技能：');
+    for (const x of skillHist) {
+      lines.push(`  · R${x.round}：${x.mySkill.trim()}`);
+    }
+  }
+
+  // 历轮票型
+  const voteHist = pastRounds.filter((x) => x.votes.length);
+  if (voteHist.length) {
+    lines.push('- 历轮票型：');
+    for (const x of voteHist) {
+      const votes = x.votes.map((v) => `${v.from || '?'}号→${v.to ? v.to + '号' : '弃'}`).join('，');
+      lines.push(`  · R${x.round}：${votes}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * 渲染单轮完整原文（夜晚 + 上警 + 发言 + 票型）。
+ * 复盘模式和非复盘的"当前轮"都用它。
+ */
+function renderRoundDetail(round, lines) {
+  lines.push('');
+  lines.push(`### 第 ${round.round} 轮`);
+  lines.push(`出局：${round.deaths.length ? round.deaths.join(', ') + '号' : '无人出局'}`);
+  if (round.mySkill) {
+    lines.push(`我夜间技能：${round.mySkill}`);
+  }
+  // 上警环节（仅第 1 轮有数据时输出）
+  if (round.captain) {
+    const cap = round.captain;
+    const hasCapInfo =
+      cap.runners.length ||
+      cap.withdrawn.length ||
+      cap.speeches.length ||
+      cap.elected ||
+      cap.badgeFlow;
+    if (hasCapInfo) {
+      lines.push('上警环节：');
+      if (cap.runners.length) {
+        const active = cap.runners.filter((s) => !cap.withdrawn.includes(s));
+        lines.push(`- 上警：${cap.runners.join(', ')}号`);
+        if (cap.withdrawn.length) {
+          lines.push(`- 退水：${cap.withdrawn.join(', ')}号（最终参选 ${active.length ? active.join(', ') + '号' : '无'}）`);
+        }
+      }
+      if (cap.speeches.length) {
+        lines.push('- 警上发言：');
+        for (const s of cap.speeches) {
+          lines.push(`  - ${s.seat ? s.seat + '号' : '?'}：${s.text}`);
+        }
+      }
+      if (cap.elected) {
+        lines.push(`- 当选警长：${cap.elected}号`);
+      } else if (cap.runners.length) {
+        lines.push('- 当选警长：未选出（PK / 流局）');
+      }
+      if (cap.badgeFlow) {
+        lines.push(`- 警徽流：${cap.badgeFlow}`);
+      }
+    }
+  }
+  if (round.speeches.length) {
+    lines.push('白天发言：');
+    for (const s of round.speeches) {
+      lines.push(`- ${s.seat ? s.seat + '号' : '?'}：${s.text}`);
+    }
+  }
+  if (round.votes.length) {
+    lines.push('票型：');
+    for (const v of round.votes) {
+      lines.push(`- ${v.from || '?'}号 → ${v.to ? v.to + '号' : '弃票'}`);
+    }
+  }
+}
 
 /** 构造发给 LLM 的对话上下文 */
 function buildMessages(forReview = false) {
@@ -78,62 +202,23 @@ function buildMessages(forReview = false) {
     lines.push(`- 规则版本标记：${versionKeys.join(', ')}`);
   }
   lines.push('');
-  lines.push(`## 当前局面（第 ${game.currentRound} 轮）`);
 
-  const allRounds = forReview ? game.rounds : [r.value];
-  for (const round of allRounds) {
-    lines.push('');
-    lines.push(`### 第 ${round.round} 轮`);
-    lines.push(`出局：${round.deaths.length ? round.deaths.join(', ') + '号' : '无人出局'}`);
-    if (round.mySkill) {
-      lines.push(`我夜间技能：${round.mySkill}`);
+  if (forReview) {
+    // 复盘模式：全量所有轮原文（B1 例外，复盘需要完整推理链）
+    lines.push(`## 完整对局记录（共 ${game.rounds.length} 轮）`);
+    for (const round of game.rounds) {
+      renderRoundDetail(round, lines);
     }
-    // 上警环节（仅第 1 轮有数据时输出）
-    if (round.captain) {
-      const cap = round.captain;
-      const hasCapInfo =
-        cap.runners.length ||
-        cap.withdrawn.length ||
-        cap.speeches.length ||
-        cap.elected ||
-        cap.badgeFlow;
-      if (hasCapInfo) {
-        lines.push('上警环节：');
-        if (cap.runners.length) {
-          const active = cap.runners.filter((s) => !cap.withdrawn.includes(s));
-          lines.push(`- 上警：${cap.runners.join(', ')}号`);
-          if (cap.withdrawn.length) {
-            lines.push(`- 退水：${cap.withdrawn.join(', ')}号（最终参选 ${active.length ? active.join(', ') + '号' : '无'}）`);
-          }
-        }
-        if (cap.speeches.length) {
-          lines.push('- 警上发言：');
-          for (const s of cap.speeches) {
-            lines.push(`  - ${s.seat ? s.seat + '号' : '?'}：${s.text}`);
-          }
-        }
-        if (cap.elected) {
-          lines.push(`- 当选警长：${cap.elected}号`);
-        } else if (cap.runners.length) {
-          lines.push('- 当选警长：未选出（PK / 流局）');
-        }
-        if (cap.badgeFlow) {
-          lines.push(`- 警徽流：${cap.badgeFlow}`);
-        }
-      }
+  } else {
+    // A4：常规分析 = 历史已知事实（紧凑摘要）+ 当前轮完整原文
+    const pastRounds = game.rounds.filter((x) => x.round !== game.currentRound);
+    const facts = buildKnownFacts(pastRounds);
+    if (facts) {
+      lines.push(facts);
+      lines.push('');
     }
-    if (round.speeches.length) {
-      lines.push('白天发言：');
-      for (const s of round.speeches) {
-        lines.push(`- ${s.seat ? s.seat + '号' : '?'}：${s.text}`);
-      }
-    }
-    if (round.votes.length) {
-      lines.push('票型：');
-      for (const v of round.votes) {
-        lines.push(`- ${v.from || '?'}号 → ${v.to ? v.to + '号' : '弃票'}`);
-      }
-    }
+    lines.push(`## 本轮报告（第 ${game.currentRound} 轮）`);
+    renderRoundDetail(r.value, lines);
   }
 
   lines.push('');
@@ -142,7 +227,7 @@ function buildMessages(forReview = false) {
   lines.push(alive.length ? alive.join(', ') + '号' : '（无）');
 
   lines.push('');
-  lines.push('请按【输出格式】分析本轮。');
+  lines.push(forReview ? '请按【终局复盘】段输出。' : '请按【输出格式】分析本轮。');
 
   return [{ role: 'user', content: lines.join('\n') }];
 }
@@ -192,20 +277,23 @@ function next() {
 }
 
 /**
- * P1-9：破坏性操作确认对话框。
- * - 重开：清空整局，不可恢复，必须确认
- * - 结束：进入复盘，不可逆，必须确认
- * - 下一轮：仅当前轮无 analysis 且有录入时确认（见 next()）
+ * F1a：重开确认改用模态（替代 confirm）。
+ * 模态里二选一：「同配置重开」（保留 setup）或「完全重开」（回 SETUP）。
  */
 function guardedReset() {
-  const roundCount = game.rounds.length;
-  const analyzedCount = game.rounds.filter((r) => r.analysis).length;
-  const msg =
-    roundCount > 1 || analyzedCount > 0
-      ? `确定重开？当前对局全部进度（${roundCount} 轮、${analyzedCount} 份分析）将被清空，不可恢复。`
-      : '确定重开？当前对局进度将被清空。';
-  if (!confirm(msg)) return;
-  resetGame();
+  showResetModal.value = true;
+}
+
+/** F1a：同配置重开（保留板子/身份/座位/规则/熟人） */
+function resetKeepSetup() {
+  resetGame({ keepSetup: true });
+  showResetModal.value = false;
+}
+
+/** F1a：完全重开（回 SETUP 向导） */
+function resetFull() {
+  resetGame({ keepSetup: false });
+  showResetModal.value = false;
 }
 
 function guardedEnd() {
@@ -424,6 +512,45 @@ const aliveCount = computed(() => game.players.filter((p) => p.alive).length);
         </div>
 
         <button class="btn-primary w-full" @click="showEditSetup = false">完成</button>
+      </div>
+    </div>
+
+    <!-- F1a：重开确认模态（同配置 vs 完全重开） -->
+    <div
+      v-if="showResetModal"
+      class="fixed inset-0 backdrop-blur z-50 flex items-end sm:items-center justify-center"
+      style="background: rgba(5,8,17,0.78);"
+      @click.self="showResetModal = false"
+    >
+      <div
+        class="rounded-t-2xl sm:rounded-2xl max-w-md w-full p-4 space-y-3"
+        style="background: linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(5,8,17,0.98) 100%); border: 1px solid rgba(212,175,55,0.3);"
+      >
+        <div class="font-serif font-bold text-parchment">重开对局</div>
+        <div class="text-xs text-parchment-200/60">
+          当前：{{ game.setup.board }} · {{ game.setup.myRole }} · {{ game.setup.mySeat }}号 · {{ game.rounds.length }} 轮
+        </div>
+        <button
+          class="btn-primary w-full text-left flex items-center gap-2"
+          @click="resetKeepSetup"
+        >
+          <span class="text-lg">🔄</span>
+          <div>
+            <div class="font-semibold">同配置重开</div>
+            <div class="text-xs opacity-80">保留板子/身份/座位/熟人，清空轮次。线下连开下一局选这个。</div>
+          </div>
+        </button>
+        <button
+          class="btn-secondary w-full text-left flex items-center gap-2"
+          @click="resetFull"
+        >
+          <span class="text-lg">🗑</span>
+          <div>
+            <div class="font-semibold">完全重开</div>
+            <div class="text-xs opacity-70">回到 SETUP 向导，重新选板子和身份。</div>
+          </div>
+        </button>
+        <button class="btn-ghost w-full text-xs" @click="showResetModal = false">取消</button>
       </div>
     </div>
   </div>

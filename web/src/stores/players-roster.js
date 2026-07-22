@@ -80,6 +80,7 @@ export function createPlayer(data = {}) {
     avatar: data.avatar || AVATAR_POOL[Math.floor(Math.random() * 8)],
     styleTags: data.styleTags || [],
     note: data.note || '',
+    lastPlayedAt: 0, // F2：最后一次开新局时绑定到此玩家的时刻（0 = 从未）
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -120,4 +121,31 @@ export function formatBindingsForPrompt(bindings) {
     lines.push(parts.join(' '));
   }
   return lines.join('；');
+}
+
+/**
+ * F2：按 lastPlayedAt 倒序排档案库（常一起玩的排前面，从未一起玩的排最后）。
+ */
+export function playersByLastPlayed() {
+  return [...roster.players].sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0));
+}
+
+/** F2：>30 天视为"生疏"阈值 */
+export const STALE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * F2：把 lastPlayedAt 渲染成相对时间 chip 文本。
+ * @returns {{text: string, stale: boolean}} 0 或缺失返回 {text:'', stale:false}
+ */
+export function lastPlayedLabel(lastPlayedAt) {
+  if (!lastPlayedAt) return { text: '', stale: false };
+  const diff = Date.now() - lastPlayedAt;
+  const stale = diff > STALE_THRESHOLD_MS;
+  const day = 24 * 60 * 60 * 1000;
+  if (diff < day) return { text: '今天', stale: false };
+  if (diff < 2 * day) return { text: '昨天', stale: false };
+  if (diff < 7 * day) return { text: `${Math.floor(diff / day)}天前`, stale: false };
+  if (diff < 30 * day) return { text: `${Math.floor(diff / (7 * day))}周前`, stale: false };
+  if (diff < 365 * day) return { text: `${Math.floor(diff / (30 * day))}月前`, stale };
+  return { text: `${Math.floor(diff / (365 * day))}年前`, stale };
 }

@@ -305,3 +305,69 @@ describe('canEditSetup / updateSetup（P2-18）', () => {
     expect(gameMod.game.players[0].isMe).toBe(false);
   });
 });
+
+describe('resetGame({keepSetup}) （F1a）', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    gameMod.startGame({
+      board: '9预女猎',
+      myRole: '预言家',
+      mySeat: 3,
+      playerStyles: '玩家风格备注',
+      ruleVersion: { no_captain_9p: true },
+      seatBindings: { '1': 'p_a', '5': 'p_b' },
+    });
+    // 制造一些轮次数据
+    gameMod.nextRound();
+    gameMod.game.rounds[0].analysis = 'R1 分析';
+    gameMod.game.rounds[0].deaths = [7];
+    gameMod.toggleSeatAlive(8); // 8号出局
+  });
+
+  it('keepSetup=true：保留 setup + seatBindings，清轮次重建 players', () => {
+    gameMod.resetGame({ keepSetup: true });
+    expect(gameMod.game.setup.board).toBe('9预女猎');
+    expect(gameMod.game.setup.myRole).toBe('预言家');
+    expect(gameMod.game.setup.mySeat).toBe(3);
+    expect(gameMod.game.setup.playerStyles).toBe('玩家风格备注');
+    expect(gameMod.game.seatBindings).toEqual({ '1': 'p_a', '5': 'p_b' });
+    // players 重建为 9 人全存活
+    expect(gameMod.game.players.length).toBe(9);
+    expect(gameMod.game.players.every((p) => p.alive)).toBe(true);
+    expect(gameMod.game.players[2].isMe).toBe(true); // 3 号是我
+    // 轮次重置为 R1
+    expect(gameMod.game.rounds.length).toBe(1);
+    expect(gameMod.game.rounds[0].round).toBe(1);
+    expect(gameMod.game.rounds[0].analysis).toBe('');
+    expect(gameMod.game.currentRound).toBe(1);
+    expect(gameMod.game.phase).toBe('playing');
+  });
+
+  it('keepSetup=false（默认）：全清回 setup 阶段', () => {
+    gameMod.resetGame();
+    expect(gameMod.game.setup.board).toBe('');
+    expect(gameMod.game.players.length).toBe(0);
+    expect(gameMod.game.rounds.length).toBe(0);
+    expect(gameMod.game.phase).toBe('setup');
+  });
+
+  it('keepSetup=true 但无 setup.board：退化为全清', () => {
+    gameMod.resetGame(); // 先清空
+    gameMod.resetGame({ keepSetup: true }); // 无 board 时
+    expect(gameMod.game.phase).toBe('setup');
+  });
+
+  it('keepSetup=true 自定义板子：从 boardDesc 解析人数', () => {
+    gameMod.startGame({
+      board: '自定义：12人含狼美人',
+      myRole: '预言家',
+      mySeat: 1,
+      playerStyles: '',
+      ruleVersion: {},
+      boardDesc: '12 人局，4 神 4 民 4 狼含狼美人',
+    });
+    gameMod.resetGame({ keepSetup: true });
+    expect(gameMod.game.players.length).toBe(12);
+    expect(gameMod.game.setup.board).toBe('自定义：12人含狼美人');
+  });
+});

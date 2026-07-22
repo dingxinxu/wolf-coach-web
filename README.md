@@ -17,6 +17,8 @@
 - **🛡 身份自洽过滤**：选完板子后，身份卡按该板子的 `roles` 数组过滤，防止矛盾组合（如 9 预女猎板不显示狼王）。
 - **🔴 夜晚 / 🟣 上警 / 🟡 发言 / 🔴 票型**：第 1 轮自动显示上警环节（上警玩家、退水、警上发言、当选警长、警徽流），与"无警长"规则联动。
 - **⚙️ setup 可编辑**：仅第 1 轮且当前轮无 analysis 时允许改身份/座位（`canEditSetup()` 守卫）。改板子请用「重开」。
+- **🧠 跨轮记忆**：每轮分析时，前端自动把历史已知事实（累积死亡/警长警徽流/我的夜间技能史/历轮票型）抽取成紧凑清单随请求发送，教练能联动多轮信息推理，且不破坏 prompt cache 命中率。
+- **🔄 快速重开**：线下面杀连开下一局时，模态选择「同配置重开」保留板子/身份/座位/熟人绑定，一键开局；「完全重开」回 SETUP 向导。
 - **🎙 录音 + 暂停/继续**：每个玩家发言一段录音，Groq Whisper large-v3 自动转写；录音中可暂停思考再继续，有效时长不含暂停段，120s 上限按净录音计算。
 - **🧠 教练级分析**：注入 wolf-game-coach 全套规则+策略文档作为 system prompt，LLM 按 6 段格式输出（追问/态势/发言/决策/风险/下轮），并追加【玩家情绪】表格。实测 **prompt cache 命中率 99.84%**（DeepSeek，system prompt ~32K tokens）。
 - **🛡 SSE 健壮性**：上游错误事件捕获 + HTTP 状态码映射（401/403/429/502 友好提示）+ 流式中断 partial 标记 + 30s stall 超时 + 用户取消支持。
@@ -34,10 +36,12 @@
 - **🔐 访问码系统**：管理员批量生成（可设「每日用量上限」+「有效期天数」）、可撤销；持码用户才能用共享池；AES-GCM 加密存储 apiKey。访问码前端 sessionStorage + 7 天 TTL，Worker 端 KV 校验过期/用量。
 - **🌐 CORS 白名单**：Worker `cors(request, env, res)` 中间件按 `ALLOWED_ORIGINS` 白名单放行，非白名单 origin 被拒（防 admin 密码被跨站爆破）。
 - **🚦 KV 限流**：每访问码每日用量计数，超出 `dailyLimit`（默认 100）返回 429，防账单被滥用刷爆。
+- **🛡 input size 预检**：Worker 端对 system+user 合计 >60K 字符的请求直接 400 拒绝，防超大 message 单次烧账单。
+- **🔒 admin 失败限流**：连续 5 次密码错误锁 10 分钟（按 IP，KV 计数），防在线字典爆破 admin 密码。
 - **📝 marked + DOMPurify**：教练分析 markdown 渲染用 `marked` + `DOMPurify`（XSS 防护），替代了早期自写正则。
 - **⚡ prompt cache 优化**：`buildSystemPrompt` 输出固定字符串（无时间戳/随机），实测 DeepSeek prompt cache 命中率 99.84%，每次调用省 ~90% input token 成本。
 - **📦 PWA 离线缓存**：`vite-plugin-pwa` 预缓存 App Shell + 9 webp + 4 skill md；离线可查术语/FAQ/历史对局（LLM/STT 接口不缓存）。
-- **✅ Vitest 单测**：46 用例覆盖 markdown 渲染 baseline + game store 常量/导入校验/自定义板子/canEditSetup + worker store localStorage 迁移。
+- **✅ Vitest 单测**：93 用例覆盖 markdown 渲染 baseline + game/roster store + worker 加密往返/访问码全分支/admin 限流/input size 阈值。
 - **离线持久化**：每局进度 + 玩家档案库 自动存 localStorage，一键导出/导入 JSON（导入含白名单字段过滤防原型链污染）。
 - **术语/FAQ 内置**：直接读技能 md，零 token 消耗。
 
@@ -227,33 +231,29 @@ Worker 部署后，访问 `https://<worker>.workers.dev/` 应返回 `{"ok":true}
 - ✅ 📝 marked + DOMPurify markdown 渲染（XSS 防护）
 - ✅ ⚡ prompt cache 稳定性优化（实测命中率 99.84%）
 - ✅ 📦 PWA 离线缓存（App Shell + 立绘 + skill md）
-- ✅ ✅ Vitest 46 用例单测（md/game/worker store）
+- ✅ ✅ Vitest 93 用例单测（md/game/worker-roster store + worker 加密/鉴权/限流）
 - ✅ 🛡 SSE 错误处理（错误码映射 + partial 标记 + 30s 超时）
 - ✅ 🛡 导入 JSON 白名单字段过滤（防原型链污染）
 - ✅ 6 板子预设 + 自定义板子 + 身份自洽过滤
 - ✅ setup 可编辑（第 1 轮无 analysis 时）
 - ✅ 破坏性操作 confirm 守卫（重开/结束/下一轮条件触发）
+- ✅ 🧠 跨轮记忆：前端抽取历史已知事实（累积死亡/警长警徽流/我的夜间技能史/历轮票型），随每轮 user message 发送，不破坏 prompt cache
+- ✅ 🛡 input size 预检（>60K 字符拒绝，防超大 message 烧账单）
+- ✅ 🔒 admin 失败限流（连续 5 次锁 10 分钟，防字典爆破）
+- ✅ 🔄 快速重开（模态选择「同配置重开」保留 setup 或「完全重开」回向导）
+- ✅ 👥 玩家档案库 last-seen 时间戳（「N天前」chip + >30天标「生疏」+ 按上次同玩排序）
 
 ### 后续候选方向
 
 - 实测线下对局体验，根据反馈调整卡片密度与交互节奏
-- 「快速重开」（保留玩家档案库 + 板子配置，仅清空当前局）
-- 玩家档案库加「上次对局」时间戳，方便识别生疏熟人
-- 共享池预算熔断（admin 设 $/day 上限，耗尽自动停）
-- 长对话的滚动窗口/压缩策略（避免 context_length_exceeded）
+- 共享池预算熔断（admin 设 $/day 上限，耗尽自动停）—— 当前已有 input size 预检 + 每访问码每日次数限额，半公开场景够用；更细的 token 计量等真出现账单问题再做
+- 跨轮记忆架构（LLM 摘要/滚动窗口）—— 当前用前端结构化事实抽取（knownFacts）覆盖 80% 跨轮场景，效果瓶颈证伪后再引入
 
 ## 🧭 项目状态
 
-- **当前阶段**：MVP 完整可用 + UI 视觉打磨 + 双 Key 安全机制 + 19 项工程改进（CORS 白名单 / KV 限流 / 访问码 TTL / SSE 健壮性 / marked+DOMPurify / prompt cache 优化 / 立绘 webp / 扩板子 / PWA / Vitest）
+- **当前阶段**：MVP 完整可用 + UI 视觉打磨 + 双 Key 安全机制 + 25 项工程改进（CORS 白名单 / KV 限流 / 访问码 TTL / SSE 健壮性 / marked+DOMPurify / prompt cache 优化 / 立绘 webp / 扩板子 / PWA / Vitest / 跨轮记忆 / input size 预检 / admin 限流 / 快速重开 / last-seen）
 - **线上访问**：<https://dingxinxu.github.io/wolf-coach-web/>
 - **Worker 部署**：CI 自动部署已启用（`ENABLE_WORKER_DEPLOY=true` + `CF_API_TOKEN`/`CF_ACCOUNT_ID`），push main 自动跑 `wrangler deploy`
-- **最新 commits**：
-  - `docs: README 全面同步 19 项改进`
-  - `docs: 忽略 .zcode/ + 更新 AGENTS.md`
-  - `chore(p2): 移除 admin 入口 + 同步 README + PWA + component class + setup 可编辑`
-  - `feat(p1): marked+DOMPurify + 立绘 webp + 扩板子 + confirm + NPE 防御`
-  - `fix(p0): CORS 白名单 + KV 限流 + 访问码 TTL + SSE 错误处理`
-  - `refactor(infra): 抽 worker.js 模块 + 引入 Vitest baseline`
 
 ## 🤝 贡献
 

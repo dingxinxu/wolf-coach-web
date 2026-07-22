@@ -20,13 +20,26 @@
 
 import { loadSkillBundle, buildSystemPrompt } from './skill-loader.js';
 
+// ========== 常量 ==========
+// 注意：Cloudflare Workers runtime 会扫描顶层 export，期望它们是 function 或 ExportedHandler。
+// 纯值（number/string）的顶层 export 会触发 "Incorrect type for map entry" 启动错误。
+// 因此这里的常量保持模块内私有，不 export；测试通过行为间接验证。
+
+// C3：单次请求 input 字符上限（system + user 合计）。
+// system prompt ~32K + user 侧 ~28K = 60K 字符 ≈ 15K tokens user，防超大 message 烧账单。
+const MAX_INPUT_CHARS = 60000;
+
+// D1：admin 登录失败限流。连续失败 5 次锁 10 分钟。
+const ADMIN_FAIL_LIMIT = 5;
+const ADMIN_LOCK_MS = 10 * 60 * 1000;
+
 // ========== KV 加密 / 访问码哈希 ==========
 
 /**
  * AES-GCM 加密 apiKey。密钥从 KV_ENC_KEY secret（base64）派生。
  * 返回 base64(iv + ciphertext)，存入 KV。
  */
-async function encryptApiKey(plain, env) {
+export async function encryptApiKey(plain, env) {
   if (!plain) return '';
   const keyRaw = base64ToBytes(env.KV_ENC_KEY);
   const key = await crypto.subtle.importKey('raw', keyRaw, 'AES-GCM', false, ['encrypt']);
@@ -41,7 +54,7 @@ async function encryptApiKey(plain, env) {
 /**
  * AES-GCM 解密 apiKey。
  */
-async function decryptApiKey(cipher, env) {
+export async function decryptApiKey(cipher, env) {
   if (!cipher) return '';
   try {
     const keyRaw = base64ToBytes(env.KV_ENC_KEY);
@@ -58,7 +71,7 @@ async function decryptApiKey(cipher, env) {
 }
 
 /** SHA-256 哈希访问码，返回 hex。 */
-async function hashAccessCode(code) {
+export async function hashAccessCode(code) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -76,9 +89,9 @@ function bytesToBase64(bytes) {
   return btoa(bin);
 }
 
-/** 生成 8 位访问码（去易混淆字符）。 */
-function generateAccessCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** 生成 8 位访问码（去易混淆字符 0/O/I/1/L）。 */
+export function generateAccessCode() {
+  const chars = 'ABCDEFGJKMNPQRSTUVWXYZ23456789';
   let code = '';
   const arr = crypto.getRandomValues(new Uint8Array(8));
   for (let i = 0; i < 8; i++) code += chars[arr[i] % chars.length];
@@ -91,7 +104,7 @@ function generateAccessCode() {
  * 解析前端传入的 LLM 配置，确定最终调用参数与 Key。
  * 返回 { baseUrl, model, reasoning, apiKey, source } 或 null
  */
-async function resolveLLMConfig(env, body) {
+export async function resolveLLMConfig(env, body) {
   // ① 用户自带
   const userLLM = body?.llm;
   if (userLLM?.apiKey) {
@@ -248,6 +261,26 @@ async function handleChat(request, env, ctx) {
   const skillBundle = await loadSkillBundle(env);
   const systemPrompt = buildSystemPrompt(skillBundle);
   const finalMessages = [{ role: 'system', content: systemPrompt }, ...userMessages];
+
+  // C3：input size 预检（防超大 message 烧账单）
+  // system prompt ~32K 字符 + user 侧合计阈值 60K 字符（≈15K tokens user）
+  // 半公开场景下够用；超阈值直接拒绝，不进 LLM 调用
+  const totalLen = finalMessages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+  if (totalLen > MAX_INPUT_CHARS) {
+    return cors(
+      request,
+      env,
+      json(
+        {
+          error: 'input_too_large',
+          detail: `输入过长（${totalLen} 字符 > ${MAX_INPUT_CHARS}）。请减少发言条数或开新局。`,
+          length: totalLen,
+          limit: MAX_INPUT_CHARS,
+        },
+        400
+      )
+    );
+  }
 
   // Prompt cache 稳定性日志（P1-7）：固定 system prompt 才能命中 DeepSeek/OpenAI prompt cache
   // 哈希应跨请求一致；若哈希变化说明 system prompt 被无意修改，cache 失效
@@ -436,11 +469,38 @@ async function handleTranscribe(request, env, ctx) {
 /**
  * admin 鉴权：X-Admin-Key 头比对 Worker secret ADMIN_PASSWORD。
  * 前端 admin 页面输入密码后存 localStorage，每次请求带 X-Admin-Key 头。
+ *
+ * D1：连续失败 5 次锁 10 分钟（按 CF-Connecting-IP）。防在线字典爆破。
  */
-function requireAdmin(request, env) {
+export async function requireAdmin(request, env) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+  // 先查是否已被锁
+  const failEntry = await env.LLM_POOL?.get(`admin_fails:${ip}`, { type: 'json' }).catch(() => null);
+  if (failEntry && failEntry.lockedUntil && Date.now() < failEntry.lockedUntil) {
+    const remainMin = Math.ceil((failEntry.lockedUntil - Date.now()) / 60000);
+    return cors(
+      request,
+      env,
+      json(
+        { error: 'admin_locked', detail: `登录失败次数过多，请 ${remainMin} 分钟后再试` },
+        429
+      )
+    );
+  }
+
   const key = request.headers.get('X-Admin-Key');
   if (!key || key !== env.ADMIN_PASSWORD) {
+    // 记一次失败
+    const count = (failEntry?.count || 0) + 1;
+    const next = { count, lockedUntil: count >= ADMIN_FAIL_LIMIT ? Date.now() + ADMIN_LOCK_MS : 0 };
+    await env.LLM_POOL?.put(`admin_fails:${ip}`, JSON.stringify(next)).catch(() => {});
     return cors(request, env, json({ error: 'unauthorized', detail: 'admin key required' }, 401));
+  }
+
+  // 成功 -> 清除失败计数
+  if (failEntry) {
+    await env.LLM_POOL?.delete(`admin_fails:${ip}`).catch(() => {});
   }
   return null;
 }
@@ -456,7 +516,7 @@ function requireAdmin(request, env) {
  *   - access_code_expired: 码已过期（admin 设的 expiresAt）
  *   - rate_limit_exceeded: 今日用量达上限
  */
-async function requireAccessCode(request, env) {
+export async function requireAccessCode(request, env) {
   const accessCode = request.headers.get('X-Access-Code');
   if (!accessCode) {
     return cors(request, env, json({ error: 'access_code_required', detail: '使用共享池需要访问码' }, 403));
@@ -492,7 +552,7 @@ async function requireAccessCode(request, env) {
 }
 
 async function handleAdmin(request, env, pathname) {
-  const guard = requireAdmin(request, env);
+  const guard = await requireAdmin(request, env);
   if (guard) return guard;
 
   // GET /admin/api/config -- 读 LLM 配置（脱敏，apiKey 解密后 mask）
@@ -605,7 +665,7 @@ async function handleAdmin(request, env, pathname) {
   return cors(request, env, json({ error: 'Not Found' }, 404));
 }
 
-function maskKey(k) {
+export function maskKey(k) {
   if (!k) return '';
   if (k.length <= 8) return '*'.repeat(k.length);
   return k.slice(0, 4) + '****' + k.slice(-4);

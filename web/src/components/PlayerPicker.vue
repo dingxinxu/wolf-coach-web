@@ -18,6 +18,8 @@ import {
   STYLE_TAGS,
   AVATAR_POOL,
   formatBindingsForPrompt,
+  playersByLastPlayed,
+  lastPlayedLabel,
 } from '../stores/players-roster.js';
 
 const props = defineProps({
@@ -52,6 +54,17 @@ function bind(seat, playerId) {
 function seatPlayer(seat) {
   const id = props.bindings[seat];
   return id ? getPlayer(id) : null;
+}
+
+/** F2：按 lastPlayedAt 倒序的档案库（常一起玩的排前面） */
+const sortedRoster = computed(() => playersByLastPlayed());
+
+/** F2：座位绑定玩家的相对时间 chip */
+function seatLastPlayed(seat) {
+  const p = seatPlayer(seat);
+  if (!p) return null;
+  const label = lastPlayedLabel(p.lastPlayedAt);
+  return label.text ? label : null;
 }
 
 function edit(seat) {
@@ -123,8 +136,16 @@ defineExpose({
             <div class="text-sm font-medium truncate text-parchment">
               {{ seatPlayer(seat).name || '未命名' }}
             </div>
-            <div v-if="seatPlayer(seat).styleTags.length" class="text-xs text-gold-400/60 truncate">
-              {{ seatPlayer(seat).styleTags.join(' / ') }}
+            <div class="flex items-center gap-1.5">
+              <div v-if="seatPlayer(seat).styleTags.length" class="text-xs text-gold-400/60 truncate">
+                {{ seatPlayer(seat).styleTags.join(' / ') }}
+              </div>
+              <span
+                v-if="seatLastPlayed(seat)"
+                class="text-[10px] px-1 rounded shrink-0"
+                :class="seatLastPlayed(seat).stale ? 'text-wolf-400/70' : 'text-parchment-200/40'"
+                style="background: rgba(5,8,17,0.5);"
+              >{{ seatLastPlayed(seat).text }}{{ seatLastPlayed(seat).stale ? '·生疏' : '' }}</span>
             </div>
           </div>
           <button class="btn-ghost text-xs" @click="edit(seat)">编辑</button>
@@ -211,13 +232,13 @@ defineExpose({
         <div class="eyebrow text-gold-400/70">为 {{ editingSeat }} 号关联玩家</div>
 
         <!-- 现有玩家快速关联 -->
-        <div v-if="roster.players.length" class="space-y-1">
-          <div class="eyebrow text-gold-400/60">从档案库选：</div>
+        <div v-if="sortedRoster.length" class="space-y-1">
+          <div class="eyebrow text-gold-400/60">从档案库选（按上次同玩排序）：</div>
           <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
             <button
-              v-for="p in roster.players"
+              v-for="p in sortedRoster"
               :key="p.id"
-              class="chip-off text-xs"
+              class="chip-off text-xs flex items-center gap-1"
               @click="bind(editingSeat, p.id); editingSeat = null"
             >
               {{ p.avatar }} {{ p.name || '未命名' }}

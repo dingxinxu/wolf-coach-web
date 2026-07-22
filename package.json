@@ -10,7 +10,7 @@
     "build:web": "pnpm --filter ./web build",
     "dev:worker": "pnpm --filter ./worker dev",
     "deploy:worker": "pnpm --filter ./worker deploy",
-    "test": "pnpm --filter ./web test"
+    "test": "pnpm --filter ./web test && pnpm --filter ./worker test"
   },
   "packageManager": "pnpm@9.0.0"
 }

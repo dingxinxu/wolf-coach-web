@@ -11,6 +11,7 @@
  * 持久化（Q9 决策 A）：localStorage 自动 + 一键导出/导入 JSON。
  */
 import { reactive, watch } from 'vue';
+import { updatePlayer } from './players-roster.js';
 
 // GitHub Pages 部署在子路径（/wolf-coach-web/），public/ 下的资源引用需带 base 前缀
 // P1-8：PNG -> webp（体积降 76%，原 PNG 保留作版权证据）
@@ -182,6 +183,11 @@ export function startGame({ board, myRole, mySeat, playerStyles, ruleVersion, se
   game.rounds = [freshRound(1)];
   game.currentRound = 1;
   game.phase = 'playing';
+
+  // F2：刷新所有绑定玩家的 lastPlayedAt（最后一次开新局一起玩的时刻）
+  for (const pid of Object.values(seatBindings)) {
+    if (pid) updatePlayer(pid, { lastPlayedAt: Date.now() });
+  }
 }
 
 /** 切换座位存活状态 */
@@ -201,8 +207,38 @@ export function currentRound() {
   return game.rounds.find((r) => r.round === game.currentRound);
 }
 
-/** 重置整局（清空 localStorage 中的游戏） */
-export function resetGame() {
+/**
+ * 重置整局。
+ * @param {Object} opts
+ * @param {boolean} opts.keepSetup - true 时保留板子/身份/座位/规则/熟人绑定，仅清空轮次+players 存活。
+ *                                  适用于「同配置连开下一局」（F1a）。
+ *                                  默认 false，行为同旧版（全清）。
+ */
+export function resetGame({ keepSetup = false } = {}) {
+  if (keepSetup && game.setup.board) {
+    // 保留 setup + seatBindings，仅清轮次、重建 players 存活态
+    const setup = game.setup;
+    const seatBindings = game.seatBindings;
+    const isCustom = typeof setup.board === 'string' && setup.board.startsWith('自定义：');
+    let total;
+    if (isCustom) {
+      const m = setup.boardDesc?.match(/(\d+)\s*人/);
+      total = m ? Number(m[1]) : 12;
+      if (total < 6 || total > 18) total = 12;
+    } else {
+      total = BOARDS[setup.board]?.total || 12;
+    }
+    game.players = Array.from({ length: total }, (_, i) => ({
+      seat: i + 1,
+      alive: true,
+      isMe: i + 1 === setup.mySeat,
+      notes: '',
+    }));
+    game.rounds = [freshRound(1)];
+    game.currentRound = 1;
+    game.phase = 'playing';
+    return;
+  }
   Object.assign(game, freshState());
   localStorage.removeItem(STORAGE_KEY);
 }
