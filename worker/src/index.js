@@ -19,26 +19,9 @@
  */
 
 import { loadSkillBundle, buildSystemPrompt } from './skill-loader.js';
-
-// ========== 常量 ==========
-// 注意：Cloudflare Workers runtime 会扫描顶层 export，期望它们是 function 或 ExportedHandler。
-// 纯值（number/string）的顶层 export 会触发 "Incorrect type for map entry" 启动错误。
-// 因此这里的常量保持模块内私有，不 export；测试通过行为间接验证。
-
-// C3：单次请求 input 字符上限（system + user 合计）。
-// system prompt ~48K（skill+rules+strategy+glossary+wrapper）+ user 侧 ~12K = 60K 字符。
-// C3 裁剪 strategy 后 system 略降；多轮对话靠 buildMessages 的历史摘要压缩控制 user 侧长度。
-export const MAX_INPUT_CHARS = 60000;
-
-// D1：admin 登录失败限流。连续失败 5 次锁 10 分钟。
-export const ADMIN_FAIL_LIMIT = 5;
-export const ADMIN_LOCK_MS = 10 * 60 * 1000;
-
-// P1-7：verify-code 公开端点 IP 日限，防高频枚举访问码（非原子，半公开场景够用）
-export const VERIFY_DAILY_LIMIT = 50;
-
-// P1-9：SSE 透传 stall 超时（与前端 llm.js STALL_MS 一致），上游无 chunk 超此时长则注入 error
-export const SSE_STALL_MS = 30000;
+// 纯值常量从单独模块 import（不在入口 re-export），避免 workerd 把 number 当 entry 扫描报错。
+// 详见 ./constants.js 顶部说明。
+import { MAX_INPUT_CHARS, ADMIN_FAIL_LIMIT, ADMIN_LOCK_MS, VERIFY_DAILY_LIMIT, SSE_STALL_MS } from './constants.js';
 
 /**
  * C3：检查 messages 总长度是否超阈值（纯函数，供 handleChat 和测试共用）。

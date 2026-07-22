@@ -20,13 +20,17 @@ import {
   requireAdmin,
   checkInputSize,
   constantTimeEqual,
+} from './index.js';
+// 纯值常量从单独模块 import（见 constants.js 说明）：workerd 扫描入口 named export，
+// number 类型的 export 会触发 dev 启动崩溃，因此常量挪出 index.js，函数保留。
+import {
   MAX_INPUT_CHARS,
   ADMIN_FAIL_LIMIT,
   ADMIN_LOCK_MS,
   VERIFY_DAILY_LIMIT,
-} from './index.js';
+} from './constants.js';
 
-// P0-6：常量从 index.js import，单一真相源，避免两处硬编码不同步
+// P0-6：常量单一真相源（constants.js），避免两处硬编码不同步
 
 // ========== E1: 纯函数 ==========
 
