@@ -16,8 +16,16 @@ import { access } from '../stores/access.js';
 import { buildAuthHeaders } from './request.js';
 
 // B4：双阈值——首 token 前用更长阈值（reasoning 模型思考期），首 token 后切短（流断检测）
-const FIRST_TOKEN_TIMEOUT_MS = 90_000; // 首 token 前 90s（覆盖 DeepSeek-R1 high / o-series 思考期）
-const STALL_TIMEOUT_MS = 30_000;       // 首 token 后 30s 无新 chunk 视为流断
+export const FIRST_TOKEN_TIMEOUT_MS = 90_000; // 首 token 前覆盖 DeepSeek-R1 high / o-series 思考期
+export const STALL_TIMEOUT_MS = 30_000;       // 首 token 后无新 chunk 视为流断
+
+/**
+ * B4：根据是否已收到首 token 选择 stall 超时阈值（纯函数，便于单测）。
+ * 首 token 前用 90s（覆盖 reasoning 思考期），首 token 后切 30s（流断检测）。
+ */
+export function pickStallTimeout(firstChunkReceived) {
+  return firstChunkReceived ? STALL_TIMEOUT_MS : FIRST_TOKEN_TIMEOUT_MS;
+}
 
 /**
  * HTTP 状态码 + 上游错误类型 -> 友好提示。
@@ -70,10 +78,9 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
   let firstChunkReceived = false; // B4：收到首个有效 chunk 后置 true，切换阈值
   const resetStall = () => {
     if (stallTimer) clearTimeout(stallTimer);
-    const ms = firstChunkReceived ? STALL_TIMEOUT_MS : FIRST_TOKEN_TIMEOUT_MS;
     stallTimer = setTimeout(() => {
       timeoutAbort.abort(new Error('stream_stall_timeout'));
-    }, ms);
+    }, pickStallTimeout(firstChunkReceived));
   };
   // 用户外部取消信号
   if (signal) {
