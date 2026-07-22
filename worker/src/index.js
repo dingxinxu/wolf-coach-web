@@ -189,7 +189,7 @@ export async function resolveLLMConfig(env, body) {
  *   - 'disabled' 时不带该字段（很多模型不支持）
  *   - 其他值原样传递为 reasoning_effort（OpenAI o 系列、DeepSeek-R1 等兼容）
  */
-async function callLLM({ baseUrl, model, reasoning, apiKey, messages, stream }) {
+async function callLLM({ baseUrl, model, reasoning, apiKey, messages, stream, signal }) {
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
   const payload = {
@@ -202,6 +202,7 @@ async function callLLM({ baseUrl, model, reasoning, apiKey, messages, stream }) 
     payload.reasoning_effort = reasoning;
   }
 
+  // P1-9：透传 AbortSignal 给 fetch，stall 超时后可中断上游连接释放 Worker
   return fetch(url, {
     method: 'POST',
     headers: {
@@ -209,6 +210,7 @@ async function callLLM({ baseUrl, model, reasoning, apiKey, messages, stream }) 
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
@@ -320,10 +322,14 @@ async function handleChat(request, env, ctx) {
   }
 
   try {
+    // P1-9：AbortController 用于 stall 超时后中断上游 fetch，释放 Worker 连接
+    // （signal 透传给 callLLM 内的 fetch；stream 路径 stall 时调 abort，非 stream 路径不触发）
+    const upstreamAbort = new AbortController();
     const upstream = await callLLM({
       ...cfg,
       messages: finalMessages,
       stream,
+      signal: upstreamAbort.signal,
     });
 
     if (!upstream.ok) {
@@ -334,7 +340,8 @@ async function handleChat(request, env, ctx) {
     }
 
     // 上游 ok，此时才扣访问码额度（P0-2：避免扣费却不服务）
-    if (accessGuard) await bumpUsage(accessGuard.codeHash, accessGuard.entry, env);
+    // ctx.waitUntil 不阻塞流式首字节，Worker 保持存活到 KV PUT 完成
+    if (accessGuard) ctx.waitUntil(bumpUsage(accessGuard.codeHash, accessGuard.entry, env));
 
     // 流式：透传 SSE（P1-9：TransformStream 包裹，30s 无 chunk 注入 error 后关闭，防上游挂起耗 Worker）
     if (stream) {
@@ -345,16 +352,23 @@ async function handleChat(request, env, ctx) {
       const resetStall = () => {
         clearStall();
         stallTimer = setTimeout(() => {
-          // 超时：注入 SSE error 事件并关闭流
+          // 超时：注入 SSE error 事件，abort 上游 fetch 释放连接，再关闭流
           try {
-            streamController?.enqueue(encoder.encode(`data:{"error":"upstream_stall","detail":"上游 ${SSE_STALL_MS / 1000}s 无响应"}\n\n`));
-            streamController?.close();
+            streamController?.enqueue(encoder.encode(`data:{"error":{"message":"upstream_stall","detail":"上游 ${SSE_STALL_MS / 1000}s 无响应"}}\n\n`));
           } catch { /* 流已关闭，忽略 */ }
+          // P1-9：先 abort 上游 fetch，防 pipeTo 永久挂起致 Worker 资源泄漏
+          // abort 后 pipeTo 会 reject，由已有 .catch(clearStall) 处理
+          upstreamAbort.abort();
+          try { streamController?.close(); } catch { /* 流已关闭，忽略 */ }
         }, SSE_STALL_MS);
       };
       const { readable, writable } = new TransformStream({
         start(controller) { streamController = controller; resetStall(); },
-        transform(chunk, controller) { resetStall(); controller.enqueue(chunk); },
+        // P1-9：stall close 后上游可能仍来 chunk，enqueue 会 throw TypeError，吞掉
+        transform(chunk, controller) {
+          resetStall();
+          try { controller.enqueue(chunk); } catch { /* controller 已关闭，忽略 */ }
+        },
         flush() { clearStall(); },
         cancel() { clearStall(); },
       });
@@ -513,11 +527,15 @@ async function handleTranscribe(request, env, ctx) {
   form.append('temperature', '0');
 
   const url = `${cfg.baseUrl.replace(/\/$/, '')}/audio/transcriptions`;
+  // P1-9：transcribe 同样加超时 abort，防上游挂死耗 Worker（与 SSE stall 同阈值）
+  const upstreamAbort = new AbortController();
+  const stallTimer = setTimeout(() => upstreamAbort.abort(), SSE_STALL_MS);
   try {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.apiKey}` },
       body: form,
+      signal: upstreamAbort.signal,
     });
 
     if (!upstream.ok) {
@@ -528,12 +546,19 @@ async function handleTranscribe(request, env, ctx) {
     }
 
     // 上游 ok，此时才扣访问码额度（P0-2：避免扣费却不服务）
-    if (accessGuard) await bumpUsage(accessGuard.codeHash, accessGuard.entry, env);
+    // ctx.waitUntil 不阻塞流式首字节，Worker 保持存活到 KV PUT 完成
+    if (accessGuard) ctx.waitUntil(bumpUsage(accessGuard.codeHash, accessGuard.entry, env));
 
     const data = await upstream.json();
     return cors(request, env, json({ text: data.text || '', _keySource: cfg.source }));
   } catch (e) {
-    return cors(request, env, json({ error: 'stt_fetch_failed', detail: String(e) }, 502));
+    // P1-9：abort 超时 -> AbortError，单独标注，便于前端区分超时 vs 网络错误
+    const isAbort = e?.name === 'AbortError';
+    return cors(request, env,
+      json({ error: isAbort ? 'stt_upstream_stall' : 'stt_fetch_failed', detail: String(e) }, 502)
+    );
+  } finally {
+    clearTimeout(stallTimer);
   }
 }
 

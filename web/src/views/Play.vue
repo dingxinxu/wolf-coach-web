@@ -52,20 +52,7 @@ const preset = computed(() => {
   return null;
 });
 
-/**
- * A4：把历史轮（不含当前轮）的结构化事实 reduce 成紧凑清单，让教练跨轮能"看见"。
- *
- * 抽 4 类字段（决策见 grill Q8）：
- *   - 累积死亡名单
- *   - 警长当选 + 警徽流（仅 R1 有）
- *   - 我的夜间技能历史（验人链 / 用药史 / 守人记录）
- *   - 历轮票型
- *
- * 不抽：历史自由文本发言（r.speeches[].text）——丢失但靠【追问】段补，B1 决策。
- *
- * @param {Array} pastRounds 历史轮（不含当前轮）
- * @returns {string} 渲染好的 markdown 段（含标题），无内容时返回空串
- */
+/** 调用教练分析当前轮或复盘（forReview=true 时生成终局复盘） */
 async function analyze(forReview = false) {
   if (!isLLMReady()) {
     error.value = '当前未配置 API Key。请到【设置】页配置。';

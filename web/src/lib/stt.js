@@ -87,33 +87,35 @@ export class Recorder {
     if (activeRecorder && activeRecorder !== this && (activeRecorder.recording || activeRecorder.paused)) {
       throw new Error('请先停止当前录音');
     }
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.mimeType = pickMimeType();
-    this.mediaRecorder = new MediaRecorder(this.stream, {
-      mimeType: this.mimeType || undefined,
-    });
-    this.chunks = [];
-    this._recordedMs = 0;
-    this._segStart = Date.now();
+    // 同步占位，消除 await getUserMedia 期间的 TOCTOU 窗口（两个实例同时通过检查）
+    activeRecorder = this;
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mimeType = pickMimeType();
+      this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: this.mimeType || undefined,
+      });
+      this.chunks = [];
+      this._recordedMs = 0;
+      this._segStart = Date.now();
 
-    this.mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) this.chunks.push(e.data);
-    };
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) this.chunks.push(e.data);
+      };
 
-    return new Promise((resolve, reject) => {
-      this._onStop = () => {
-        this._tickSegment();
-        const blob = new Blob(this.chunks, { type: this.mimeType });
-        resolve({ blob, mimeType: this.mimeType, durationMs: this._recordedMs });
-      };
-      this.mediaRecorder.onerror = (e) => reject(e.error || new Error('录音失败'));
-      this.mediaRecorder.onstop = () => {
-        // 关闭麦克风
-        this.stream?.getTracks().forEach((t) => t.stop());
-        this._onStop?.();
-      };
-      this.mediaRecorder.start();
-      activeRecorder = this; // P2-18：登记为当前活跃录音器
+      return new Promise((resolve, reject) => {
+        this._onStop = () => {
+          this._tickSegment();
+          const blob = new Blob(this.chunks, { type: this.mimeType });
+          resolve({ blob, mimeType: this.mimeType, durationMs: this._recordedMs });
+        };
+        this.mediaRecorder.onerror = (e) => reject(e.error || new Error('录音失败'));
+        this.mediaRecorder.onstop = () => {
+          // 关闭麦克风
+          this.stream?.getTracks().forEach((t) => t.stop());
+          this._onStop?.();
+        };
+        this.mediaRecorder.start();
 
       // 120s 安全上限（按有效录音时长）：定时检查
       this._timer = setInterval(() => {
@@ -122,6 +124,11 @@ export class Recorder {
         }
       }, 500);
     });
+    } catch (e) {
+      // getUserMedia 拒绝或 MediaRecorder 构造失败 -> 回滚占位
+      if (activeRecorder === this) activeRecorder = null;
+      throw e;
+    }
   }
 
   /** 暂停（不释放麦克风，暂停期间不采集）。 */

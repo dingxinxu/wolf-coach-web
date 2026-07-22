@@ -71,6 +71,13 @@ describe('renderMarkdown - 行内格式', () => {
     expect(out).toMatch(/<strong[^>]*>重点<\/strong>/);
     expect(out).toContain('标题');
   });
+
+  it('P0-4 回归：blockquote 内嵌套 **粗体** 被渲染', () => {
+    // 旧 bug：blockquote 用 text 拼纯文本，** 不会被渲染
+    const out = renderMarkdown('> **重点** 引用');
+    expect(out).toContain('<blockquote');
+    expect(out).toMatch(/<strong[^>]*>重点<\/strong>/);
+  });
 });
 
 describe('renderMarkdown - 代码块', () => {

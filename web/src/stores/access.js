@@ -52,15 +52,22 @@ function loadAccessCode() {
 
 function saveAccessCode(code) {
   if (!code) return;
+  // 两行各自独立 try/catch：Safari 隐私模式 sessionStorage 可能抛错，
+  // 不应因此阻断 localStorage 写入（否则访问码只存一处，下次会话丢失）
   try {
     sessionStorage.setItem(SESSION_KEY, code);
+  } catch {}
+  try {
     localStorage.setItem(LOCAL_KEY, JSON.stringify({ code, verifiedAt: Date.now() }));
   } catch {}
 }
 
 function clearAccessCode() {
+  // 两行各自独立 try/catch：避免一方抛错导致另一方残留访问码（安全隐患）
   try {
     sessionStorage.removeItem(SESSION_KEY);
+  } catch {}
+  try {
     localStorage.removeItem(LOCAL_KEY);
   } catch {}
 }

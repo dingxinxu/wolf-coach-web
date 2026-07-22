@@ -26,22 +26,32 @@ function onKeydown(e) {
   if (e.key === 'Escape') emit('close');
 }
 
+// body 滚动锁引用计数：多个 Modal 同时打开时，只有最后一个关闭才恢复滚动，
+// 避免后关的把仍打开的 Modal 的 overflow='' 清掉
+let modalLockCount = 0;
+
 watch(
   () => props.show,
   (v) => {
     if (v) {
       document.addEventListener('keydown', onKeydown);
-      document.body.style.overflow = 'hidden';
+      if (modalLockCount++ === 0) document.body.style.overflow = 'hidden';
     } else {
       document.removeEventListener('keydown', onKeydown);
-      document.body.style.overflow = '';
+      // 计数守卫：immediate 首次以 false 触发时 count 仍为 0，不应减成负数
+      if (modalLockCount > 0 && --modalLockCount === 0) document.body.style.overflow = '';
     }
-  }
+  },
+  // immediate：父组件以 :show="true" 挂载时也要立即装 Esc 监听 + 锁 body
+  { immediate: true }
 );
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
-  document.body.style.overflow = '';
+  // 卸载时若仍处于打开态（没走过 false 分支），补扣一次引用计数，防泄漏
+  if (props.show && modalLockCount > 0 && --modalLockCount === 0) {
+    document.body.style.overflow = '';
+  }
 });
 </script>
 

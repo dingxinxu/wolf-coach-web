@@ -362,6 +362,18 @@ describe('resetGame({keepSetup}) （F1a）', () => {
     expect(store[KEY]).toBeUndefined(); // 应被 removeItem 清空、且不被回写
   });
 
+  it('P0-1 回归：resetGame 后 watch 恢复写入（suppressWrite 不永久 true）', async () => {
+    // 配套回归：resetGame 临时置 suppressWrite=true 跳过回写，须在 nextTick 后恢复，
+    // 否则后续所有状态变更都不会写回 localStorage（watch 形同虚设）
+    const KEY = 'wolf-coach-game-v1';
+    gameMod.resetGame();
+    await nextTick(); // suppressWrite 在此时恢复
+    // 再做一次状态变更，验证 watch 能正常写回
+    gameMod.game.phase = 'playing';
+    await nextTick();
+    expect(store[KEY]).toBeDefined(); // 应被 watch 写回
+  });
+
   it('keepSetup=true 但无 setup.board：退化为全清', () => {
     gameMod.resetGame(); // 先清空
     gameMod.resetGame({ keepSetup: true }); // 无 board 时

@@ -44,8 +44,10 @@ renderer.codespan = ({ text }) => `<code class="bg-zinc-800 px-1 rounded text-xs
 renderer.code = ({ text }) =>
   `<pre class="bg-zinc-950 p-3 rounded overflow-x-auto text-xs"><code>${text}</code></pre>`;
 
-renderer.blockquote = ({ text }) =>
-  `<blockquote class="border-l-2 border-zinc-600 pl-3 text-zinc-400 italic my-1">${text}</blockquote>`;
+renderer.blockquote = function ({ tokens }) {
+  const inner = this.parser.parse(tokens);
+  return `<blockquote class="border-l-2 border-zinc-600 pl-3 text-zinc-400 italic my-1">${inner}</blockquote>`;
+};
 
 // 表格 class 由 DOMPurify 保留，CSS 通过 .prose-invert table 选择器样式化
 renderer.table = function ({ header, rows }) {

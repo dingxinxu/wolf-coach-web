@@ -41,10 +41,12 @@ const EMOTION_MAP = {
  * 表格行格式：<tr>...<td>3</td><td>紧张/回避</td><td>依据</td></tr>
  */
 function postProcess(html) {
-  // 匹配 <td>情绪标签</td>（包含 / 分隔符也染色第一个）
-  return html.replace(/<td class="[^"]*">([^<]+)<\/td>/g, (match, text) => {
-    // 提取第一个情绪词（支持 / · 、 三种分隔符）
-    const firstWord = text.split(/[\/·、]/)[0].trim();
+  // 匹配 <td>情绪标签</td>：用 [^]*? 非贪婪全匹配，兼容含 <strong> 等 HTML 标签的 cell
+  // （P0-4 修复后 cell 经 parseInline 渲染，可能含内嵌标签，旧的 [^<]+ 会整体漏匹配）
+  return html.replace(/<td class="[^"]*">([^]*?)<\/td>/g, (match, text) => {
+    // 提取第一个情绪词（支持 / · 、 三种分隔符）；先去 HTML 标签，防 <strong> 包裹干扰查表
+    const plain = text.replace(/<[^>]+>/g, '');
+    const firstWord = plain.split(/[\/·、]/)[0].trim();
     const cls = EMOTION_MAP[firstWord];
     if (cls) {
       return match.replace(text, `<span class="${cls}">${text}</span>`);
