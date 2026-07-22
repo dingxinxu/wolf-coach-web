@@ -17,10 +17,12 @@ marked.setOptions({
 });
 
 // 自定义 renderer：给元素加主题 class（保持视觉风格与原渲染器一致）
+// 注：必须用普通函数（非箭头），marked 调用时 this 绑定 Renderer 实例，
+// 才能拿到 this.parser 递归渲染子 token（修复 P0-4：cell/heading/strong 内嵌套不渲染）
 const renderer = new marked.Renderer();
 
-renderer.heading = ({ tokens, depth }) => {
-  const text = tokens.map((t) => (typeof t === 'string' ? t : t.text || '')).join('');
+renderer.heading = function ({ tokens, depth }) {
+  const inner = this.parser.parseInline(tokens);
   const clsMap = {
     1: 'text-2xl font-bold mt-4 mb-2 text-wolf-400',
     2: 'text-xl font-bold mt-4 mb-2 text-wolf-400',
@@ -29,12 +31,12 @@ renderer.heading = ({ tokens, depth }) => {
     5: 'text-sm font-semibold mt-3 mb-1',
     6: 'text-sm font-semibold mt-3 mb-1',
   };
-  return `<h${depth} class="${clsMap[depth] || ''}">${text}</h${depth}>`;
+  return `<h${depth} class="${clsMap[depth] || ''}">${inner}</h${depth}>`;
 };
 
-renderer.strong = ({ tokens }) => {
-  const text = tokens.map((t) => (typeof t === 'string' ? t : t.text || '')).join('');
-  return `<strong class="text-wolf-300">${text}</strong>`;
+renderer.strong = function ({ tokens }) {
+  const inner = this.parser.parseInline(tokens);
+  return `<strong class="text-wolf-300">${inner}</strong>`;
 };
 
 renderer.codespan = ({ text }) => `<code class="bg-zinc-800 px-1 rounded text-xs">${text}</code>`;
@@ -46,12 +48,12 @@ renderer.blockquote = ({ text }) =>
   `<blockquote class="border-l-2 border-zinc-600 pl-3 text-zinc-400 italic my-1">${text}</blockquote>`;
 
 // 表格 class 由 DOMPurify 保留，CSS 通过 .prose-invert table 选择器样式化
-renderer.table = ({ header, rows }) => {
+renderer.table = function ({ header, rows }) {
   let html = '<table class="text-sm w-full my-2 border-collapse">';
   if (header) {
     html += '<thead><tr>';
     for (const h of header) {
-      html += `<th class="border border-zinc-700 px-2 py-1 bg-zinc-800 text-left font-semibold">${h.text || ''}</th>`;
+      html += `<th class="border border-zinc-700 px-2 py-1 bg-zinc-800 text-left font-semibold">${this.parser.parseInline(h.tokens)}</th>`;
     }
     html += '</tr></thead>';
   }
@@ -60,7 +62,7 @@ renderer.table = ({ header, rows }) => {
     for (const row of rows) {
       html += '<tr>';
       for (const cell of row) {
-        html += `<td class="border border-zinc-700 px-2 py-1 bg-zinc-900/50">${cell.text || ''}</td>`;
+        html += `<td class="border border-zinc-700 px-2 py-1 bg-zinc-900/50">${this.parser.parseInline(cell.tokens)}</td>`;
       }
       html += '</tr>';
     }

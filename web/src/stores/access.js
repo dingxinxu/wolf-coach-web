@@ -54,15 +54,15 @@ function saveAccessCode(code) {
   if (!code) return;
   try {
     sessionStorage.setItem(SESSION_KEY, code);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({ code, verifiedAt: Date.now() }));
   } catch {}
-  localStorage.setItem(LOCAL_KEY, JSON.stringify({ code, verifiedAt: Date.now() }));
 }
 
 function clearAccessCode() {
   try {
     sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LOCAL_KEY);
   } catch {}
-  localStorage.removeItem(LOCAL_KEY);
 }
 
 const state = reactive({

@@ -10,7 +10,7 @@
  *
  * 持久化（Q9 决策 A）：localStorage 自动 + 一键导出/导入 JSON。
  */
-import { reactive, watch } from 'vue';
+import { reactive, watch, nextTick } from 'vue';
 import { updatePlayer } from './players-roster.js';
 
 // GitHub Pages 部署在子路径（/wolf-coach-web/），public/ 下的资源引用需带 base 前缀
@@ -146,9 +146,14 @@ function load() {
 
 export const game = reactive(load());
 
+// resetGame 全清时置 true，跳过 watch 回写，避免 Object.assign(freshState) 触发
+// 的异步 flush 把空状态写回 localStorage、覆盖掉紧随其后的 removeItem
+let suppressWrite = false;
+
 watch(
   game,
   (v) => {
+    if (suppressWrite) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
   },
   { deep: true }
@@ -238,8 +243,12 @@ export function resetGame({ keepSetup = false } = {}) {
     game.phase = 'playing';
     return;
   }
+  // Object.assign 触发深度 watch（flush:'pre' 异步），其回调会回写空状态覆盖 removeItem。
+  // 置 suppressWrite 让该次 flush 跳过回写，保证 removeItem 生效；下一 tick 恢复。
+  suppressWrite = true;
   Object.assign(game, freshState());
   localStorage.removeItem(STORAGE_KEY);
+  nextTick(() => { suppressWrite = false; });
 }
 
 /** 导出 JSON（给"导出按钮"用） */

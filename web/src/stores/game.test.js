@@ -9,6 +9,7 @@
  * 但 node 环境无 localStorage，需要 mock。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 
 // ===== mock localStorage（node 环境无）=====
 const store = {};
@@ -349,6 +350,16 @@ describe('resetGame({keepSetup}) （F1a）', () => {
     expect(gameMod.game.players.length).toBe(0);
     expect(gameMod.game.rounds.length).toBe(0);
     expect(gameMod.game.phase).toBe('setup');
+  });
+
+  it('keepSetup=false：resetGame 后 localStorage 被清空且不被 watch 回写（P0-1 回归保护）', async () => {
+    // 旧 bug：Object.assign(freshState) 触发的 watch flush 会把空状态写回 localStorage，
+    // 覆盖掉紧随其后的 removeItem，导致 localStorage 残留空状态对象。
+    const KEY = 'wolf-coach-game-v1';
+    expect(store[KEY]).toBeDefined(); // startGame 后有存档
+    gameMod.resetGame();
+    await nextTick(); // 等 watch flush 完成
+    expect(store[KEY]).toBeUndefined(); // 应被 removeItem 清空、且不被回写
   });
 
   it('keepSetup=true 但无 setup.board：退化为全清', () => {

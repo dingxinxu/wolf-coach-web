@@ -63,6 +63,14 @@ describe('renderMarkdown - 行内格式', () => {
     expect(out).toContain('<code');
     expect(out).toContain('inline');
   });
+
+  it('P0-4 回归：heading 内嵌套 **粗体** 被渲染', () => {
+    // 旧 bug：heading 用 t.text 拼接，** 不会被渲染成 <strong>
+    const out = renderMarkdown('# **重点**标题');
+    expect(out).toMatch(/<h1/);
+    expect(out).toMatch(/<strong[^>]*>重点<\/strong>/);
+    expect(out).toContain('标题');
+  });
 });
 
 describe('renderMarkdown - 代码块', () => {
@@ -108,5 +116,18 @@ describe('renderMarkdown - 表格', () => {
     expect(out).toContain('紧张/回避');
     // td 应带 class（自定义 renderer 注入），AnalysisPanel 的 postProcess 依赖此结构
     expect(out).toMatch(/<td class="[^"]*">紧张\/回避<\/td>/);
+  });
+
+  it('P0-4 回归：表格 cell 内嵌套 **粗体** / `code` 被渲染', () => {
+    // 旧 bug：cell.text 拼纯文本，cell 内 markdown 符号原样显示
+    const out = renderMarkdown('| 类型 | 说明 |\n|---|---|\n| **关键** | `术语` |');
+    expect(out).toMatch(/<strong[^>]*>关键<\/strong>/);
+    expect(out).toMatch(/<code[^>]*>术语<\/code>/);
+  });
+
+  it('P0-4 回归：表头 th 内嵌套也被渲染', () => {
+    const out = renderMarkdown('| **重点** | B |\n|---|---|\n| 1 | 2 |');
+    expect(out).toContain('<th');
+    expect(out).toMatch(/<strong[^>]*>重点<\/strong>/);
   });
 });

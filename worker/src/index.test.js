@@ -15,14 +15,16 @@ import {
   generateAccessCode,
   maskKey,
   resolveLLMConfig,
-  requireAccessCode,
+  validateAccessCode,
+  bumpUsage,
   requireAdmin,
   checkInputSize,
+  MAX_INPUT_CHARS,
+  ADMIN_FAIL_LIMIT,
+  ADMIN_LOCK_MS,
 } from './index.js';
 
-// 常量 MAX_INPUT_CHARS / ADMIN_FAIL_LIMIT / ADMIN_LOCK_MS 不 export（避免 CF Workers
-// runtime 启动报错），这里用行为测试间接覆盖它们的值。
-const ADMIN_FAIL_LIMIT = 5; // 与 index.js 一致；改值时两处同步
+// P0-6：常量从 index.js import，单一真相源，避免两处硬编码不同步
 
 // ========== E1: 纯函数 ==========
 
@@ -229,7 +231,7 @@ describe('E2 · resolveLLMConfig 优先级', () => {
   });
 });
 
-describe('E2 · requireAccessCode 全分支', () => {
+describe('E2 · validateAccessCode + bumpUsage 全分支', () => {
   const baseCode = 'TESTCODE1';
   let codeHash;
 
@@ -245,26 +247,28 @@ describe('E2 · requireAccessCode 全分支', () => {
 
   it('未带 X-Access-Code 头 -> 403 access_code_required', async () => {
     const env = await envWithCode({ enabled: true, dailyLimit: 100, usage: { day: '2026-01-01', count: 0 } });
-    const res = await requireAccessCode(mockRequest(null), env);
-    expect(res).not.toBeNull();
-    expect(res.status).toBe(403);
-    const body = await res.json();
+    const r = await validateAccessCode(mockRequest(null), env);
+    expect(r.ok).toBe(false);
+    expect(r.response.status).toBe(403);
+    const body = await r.response.json();
     expect(body.error).toBe('access_code_required');
   });
 
   it('带无效码（KV 无此 hash）-> 403 invalid_access_code', async () => {
     const env = await envWithCode(null);
-    const res = await requireAccessCode(mockRequest('WRONGCODE'), env);
-    expect(res.status).toBe(403);
-    const body = await res.json();
+    const r = await validateAccessCode(mockRequest('WRONGCODE'), env);
+    expect(r.ok).toBe(false);
+    expect(r.response.status).toBe(403);
+    const body = await r.response.json();
     expect(body.error).toBe('invalid_access_code');
   });
 
   it('码存在但 enabled=false -> 403 invalid_access_code', async () => {
     const env = await envWithCode({ enabled: false, dailyLimit: 100, usage: { day: '2026-01-01', count: 0 } });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res.status).toBe(403);
-    const body = await res.json();
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(false);
+    expect(r.response.status).toBe(403);
+    const body = await r.response.json();
     expect(body.error).toBe('invalid_access_code');
   });
 
@@ -275,21 +279,22 @@ describe('E2 · requireAccessCode 全分支', () => {
       expiresAt: Date.now() - 1000,
       usage: { day: '2026-01-01', count: 0 },
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res.status).toBe(403);
-    const body = await res.json();
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(false);
+    expect(r.response.status).toBe(403);
+    const body = await r.response.json();
     expect(body.error).toBe('access_code_expired');
   });
 
-  it('永久码（expiresAt=0）-> 不按过期处理', async () => {
+  it('永久码（expiresAt=0）-> 通过', async () => {
     const env = await envWithCode({
       enabled: true,
       dailyLimit: 100,
       expiresAt: 0,
       usage: { day: '2026-01-01', count: 0 },
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res).toBeNull(); // 通过
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true);
   });
 
   it('今日用量达上限 -> 429 rate_limit_exceeded', async () => {
@@ -299,9 +304,10 @@ describe('E2 · requireAccessCode 全分支', () => {
       dailyLimit: 100,
       usage: { day: today, count: 100 },
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res.status).toBe(429);
-    const body = await res.json();
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(false);
+    expect(r.response.status).toBe(429);
+    const body = await r.response.json();
     expect(body.error).toBe('rate_limit_exceeded');
     expect(body.limit).toBe(100);
     expect(body.used).toBe(100);
@@ -313,23 +319,22 @@ describe('E2 · requireAccessCode 全分支', () => {
       dailyLimit: 100,
       usage: { day: '2020-01-01', count: 100 }, // 昨天已满
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res).toBeNull(); // 今天重置，通过
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true); // 今天重置，通过
   });
 
-  it('通过 -> 返回 null 且 count 自增并写回 KV', async () => {
+  it('校验通过 -> 不自增 count（计数由 bumpUsage 单独负责）', async () => {
     const today = new Date().toISOString().slice(0, 10);
     const env = await envWithCode({
       enabled: true,
       dailyLimit: 100,
       usage: { day: today, count: 5 },
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res).toBeNull();
-    // 验证写回
-    const updated = JSON.parse(env.LLM_POOL.store[`code:${codeHash}`]);
-    expect(updated.usage.count).toBe(6);
-    expect(updated.usage.day).toBe(today);
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true);
+    // validate 不应写回 KV
+    const after = JSON.parse(env.LLM_POOL.store[`code:${codeHash}`]);
+    expect(after.usage.count).toBe(5); // 仍是 5，未自增
   });
 
   it('无 dailyLimit 字段 -> 默认 100', async () => {
@@ -338,8 +343,36 @@ describe('E2 · requireAccessCode 全分支', () => {
       enabled: true,
       usage: { day: today, count: 99 }, // 接近默认上限
     });
-    const res = await requireAccessCode(mockRequest(baseCode), env);
-    expect(res).toBeNull(); // 第 100 次，仍通过
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true); // 第 100 次，仍通过
+  });
+
+  it('bumpUsage -> count 自增并写回 KV', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const entry = { enabled: true, dailyLimit: 100, usage: { day: today, count: 5 } };
+    const env = await envWithCode(entry);
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true);
+    await bumpUsage(r.codeHash, r.entry, env);
+    const updated = JSON.parse(env.LLM_POOL.store[`code:${codeHash}`]);
+    expect(updated.usage.count).toBe(6);
+    expect(updated.usage.day).toBe(today);
+  });
+
+  it('P0-2 回归：no_api_key 路径不调 bumpUsage -> count 不变', async () => {
+    // 模拟 handleChat 在 resolveConfig 返回 null 时不扣费：
+    // validate 通过后 entry.count 仍是原值，bumpUsage 不被调用
+    const today = new Date().toISOString().slice(0, 10);
+    const env = await envWithCode({
+      enabled: true,
+      dailyLimit: 100,
+      usage: { day: today, count: 7 },
+    });
+    const r = await validateAccessCode(mockRequest(baseCode), env);
+    expect(r.ok).toBe(true);
+    // 模拟 resolveConfig 失败 -> 不调 bumpUsage
+    const unchanged = JSON.parse(env.LLM_POOL.store[`code:${codeHash}`]);
+    expect(unchanged.usage.count).toBe(7); // 未扣
   });
 });
 

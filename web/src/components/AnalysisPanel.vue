@@ -43,8 +43,8 @@ const EMOTION_MAP = {
 function postProcess(html) {
   // 匹配 <td>情绪标签</td>（包含 / 分隔符也染色第一个）
   return html.replace(/<td class="[^"]*">([^<]+)<\/td>/g, (match, text) => {
-    // 提取第一个情绪词
-    const firstWord = text.split(/[\/·]/)[0].trim();
+    // 提取第一个情绪词（支持 / · 、 三种分隔符）
+    const firstWord = text.split(/[\/·、]/)[0].trim();
     const cls = EMOTION_MAP[firstWord];
     if (cls) {
       return match.replace(text, `<span class="${cls}">${text}</span>`);

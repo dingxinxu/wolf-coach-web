@@ -27,11 +27,11 @@ import { loadSkillBundle, buildSystemPrompt } from './skill-loader.js';
 
 // C3：单次请求 input 字符上限（system + user 合计）。
 // system prompt ~32K + user 侧 ~28K = 60K 字符 ≈ 15K tokens user，防超大 message 烧账单。
-const MAX_INPUT_CHARS = 60000;
+export const MAX_INPUT_CHARS = 60000;
 
 // D1：admin 登录失败限流。连续失败 5 次锁 10 分钟。
-const ADMIN_FAIL_LIMIT = 5;
-const ADMIN_LOCK_MS = 10 * 60 * 1000;
+export const ADMIN_FAIL_LIMIT = 5;
+export const ADMIN_LOCK_MS = 10 * 60 * 1000;
 
 /**
  * C3：检查 messages 总长度是否超阈值（纯函数，供 handleChat 和测试共用）。
@@ -270,12 +270,14 @@ async function handleChat(request, env, ctx) {
   }
 
   // 用户没自带 apiKey 时，校验访问码（防共享池被白嫖）
+  // 仅校验不计数；计数在 callLLM 上游 ok 后由 bumpUsage 执行，避免扣费却不服务
+  let accessGuard = null;
   if (!body?.llm?.apiKey) {
-    const guard = await requireAccessCode(request, env);
-    if (guard) return guard;
+    accessGuard = await validateAccessCode(request, env);
+    if (!accessGuard.ok) return accessGuard.response;
   }
 
-  // 解析最终配置
+  // 解析最终配置（若池空且无 DEFAULT_LLM_API_KEY -> no_api_key，此时未计数，不扣额度）
   const cfg = await resolveLLMConfig(env, body);
   if (!cfg) {
     return cors(request, env,
@@ -306,10 +308,13 @@ async function handleChat(request, env, ctx) {
 
     if (!upstream.ok) {
       const txt = await upstream.text();
-      return cors(request, env, 
+      return cors(request, env,
         json({ error: 'upstream_error', status: upstream.status, detail: txt }, 502)
       );
     }
+
+    // 上游 ok，此时才扣访问码额度（P0-2：避免扣费却不服务）
+    if (accessGuard) await bumpUsage(accessGuard.codeHash, accessGuard.entry, env);
 
     // 流式：透传 SSE
     if (stream) {
@@ -410,10 +415,11 @@ async function handleTranscribe(request, env, ctx) {
     return cors(request, env, json({ error: 'audio (base64) and mimeType required' }, 400));
   }
 
-  // 用户没自带 stt.apiKey 时，校验访问码
+  // 用户没自带 stt.apiKey 时，校验访问码（仅校验，计数推迟到上游 ok 后）
+  let accessGuard = null;
   if (!body?.stt?.apiKey) {
-    const guard = await requireAccessCode(request, env);
-    if (guard) return guard;
+    accessGuard = await validateAccessCode(request, env);
+    if (!accessGuard.ok) return accessGuard.response;
   }
 
   const cfg = await resolveSTTConfig(env, body);
@@ -459,10 +465,13 @@ async function handleTranscribe(request, env, ctx) {
 
     if (!upstream.ok) {
       const txt = await upstream.text();
-      return cors(request, env, 
+      return cors(request, env,
         json({ error: 'stt_upstream_error', status: upstream.status, detail: txt }, 502)
       );
     }
+
+    // 上游 ok，此时才扣访问码额度（P0-2：避免扣费却不服务）
+    if (accessGuard) await bumpUsage(accessGuard.codeHash, accessGuard.entry, env);
 
     const data = await upstream.json();
     return cors(request, env, json({ text: data.text || '', _keySource: cfg.source }));
@@ -522,40 +531,46 @@ export async function requireAdmin(request, env) {
  *   - invalid_access_code: 码不存在或已撤销
  *   - access_code_expired: 码已过期（admin 设的 expiresAt）
  *   - rate_limit_exceeded: 今日用量达上限
+ *
+ * P0-2：拆成 validateAccessCode（只校验）+ bumpUsage（计数）。
+ * 计数推迟到 resolveConfig 成功 + 上游 callLLM/callSTT 返回 ok 后执行，
+ * 避免「池空/无 DEFAULT_KEY 或上游 502 时仍扣额度」。
  */
-export async function requireAccessCode(request, env) {
+export async function validateAccessCode(request, env) {
   const accessCode = request.headers.get('X-Access-Code');
   if (!accessCode) {
-    return cors(request, env, json({ error: 'access_code_required', detail: '使用共享池需要访问码' }, 403));
+    return { ok: false, response: cors(request, env, json({ error: 'access_code_required', detail: '使用共享池需要访问码' }, 403)) };
   }
   const codeHash = await hashAccessCode(accessCode);
   const entry = await env.LLM_POOL?.get(`code:${codeHash}`, { type: 'json' });
   if (!entry || !entry.enabled) {
-    return cors(request, env, json({ error: 'invalid_access_code' }, 403));
+    return { ok: false, response: cors(request, env, json({ error: 'invalid_access_code' }, 403)) };
   }
 
   // 管理员设的过期时间（0 或不存在 = 永久）
   if (entry.expiresAt && Date.now() > entry.expiresAt) {
-    return cors(request, env, json({ error: 'access_code_expired', detail: '访问码已过期，请联系管理员' }, 403));
+    return { ok: false, response: cors(request, env, json({ error: 'access_code_expired', detail: '访问码已过期，请联系管理员' }, 403)) };
   }
 
-  // 每日用量计数（按 UTC 日期重置）
+  // 每日用量计数（按 UTC 日期重置）-- 仅校验是否超限，不自增
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   if (!entry.usage || entry.usage.day !== today) {
     entry.usage = { day: today, count: 0 };
   }
   const limit = entry.dailyLimit || 100; // 默认每日 100 次
   if (entry.usage.count >= limit) {
-    return cors(
-      request,
-      env,
-      json({ error: 'rate_limit_exceeded', detail: `今日用量已达上限 ${limit} 次`, limit, used: entry.usage.count }, 429)
-    );
+    return { ok: false, response: cors(request, env, json({ error: 'rate_limit_exceeded', detail: `今日用量已达上限 ${limit} 次`, limit, used: entry.usage.count }, 429)) };
   }
-  // 自增并写回（先写再放行，防并发超额；最坏情况是失败请求也计数，可接受）
+  return { ok: true, codeHash, entry };
+}
+
+/**
+ * 访问码用量自增并写回 KV。在确认能提供服务（resolveConfig 成功 + 上游 ok）后调用。
+ * 注：仍是 read-modify-write 非原子，并发下可能少计（已知 P1，需 Durable Object 彻底修）。
+ */
+export async function bumpUsage(codeHash, entry, env) {
   entry.usage.count += 1;
   await env.LLM_POOL?.put(`code:${codeHash}`, JSON.stringify(entry));
-  return null;
 }
 
 async function handleAdmin(request, env, pathname) {
