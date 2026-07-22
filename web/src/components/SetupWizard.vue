@@ -15,6 +15,7 @@
 import { ref, computed } from 'vue';
 import { BOARDS, ROLES, RULE_VERSIONS, startGame } from '../stores/game.js';
 import PlayerPicker from './PlayerPicker.vue';
+import Modal from './Modal.vue';
 
 const emit = defineEmits(['done']);
 
@@ -31,6 +32,10 @@ const ruleVersion = ref(
 );
 
 const playerPickerRef = ref(null);
+
+// B1：选「其他」身份时的自定义输入态
+const customRoleInput = ref(''); // 文本框值
+const showCustomRoleModal = ref(false);
 
 const boardList = Object.keys(BOARDS);
 const preset = computed(() => (board.value && !isCustom.value ? BOARDS[board.value] : null));
@@ -97,6 +102,16 @@ const ACCENT_HEX = {
 function pickBoard(b) {
   board.value = b;
   boardDesc.value = '';
+  // B2：切板子时智能清理 stale 身份。
+  // 仅当 myRole 不在新板子的 roles 列表里才清空（同系列板子切换时保留预言家/女巫等兼容身份）。
+  // 自定义板子不过滤身份，保留 myRole。
+  if (myRole.value) {
+    const newPreset = BOARDS[b];
+    const newRoles = newPreset?.roles;
+    if (newRoles && !newRoles.includes(myRole.value) && myRole.value !== '其他') {
+      myRole.value = '';
+    }
+  }
   step.value = 2;
 }
 
@@ -107,9 +122,29 @@ function pickCustomBoard() {
 }
 
 function pickRole(r) {
+  // B1：选「其他」弹输入框让用户填自定义身份名，避免透传无意义的"其他"给 LLM
+  if (r.label === '其他') {
+    customRoleInput.value = '';
+    showCustomRoleModal.value = true;
+    return;
+  }
   myRole.value = r.label;
-  if (r.label === '其他') return;
   step.value = 3;
+}
+
+/** B1：确认自定义身份 */
+function confirmCustomRole() {
+  const trimmed = customRoleInput.value.trim();
+  if (!trimmed) return;
+  myRole.value = trimmed.slice(0, 12); // 限长，防 prompt 注入超长字符串
+  showCustomRoleModal.value = false;
+  step.value = 3;
+}
+
+/** B1：取消自定义身份输入 */
+function cancelCustomRole() {
+  showCustomRoleModal.value = false;
+  customRoleInput.value = '';
 }
 
 function pickSeat(n) {
@@ -126,6 +161,16 @@ function confirm() {
   if (isCustom.value && !boardDesc.value.trim()) {
     alert('请描述自定义板子（人数、神民狼配置、特殊规则）');
     return;
+  }
+  // B2：防御性兜底——标准板子下若 myRole 不在该板子的 roles 列表（也不应是"其他"），拒绝放行
+  // 理论上 pickBoard 的智能清理已避免此情况，这里防极端路径（如回退后直接 confirm）
+  if (!isCustom.value && preset.value?.roles) {
+    if (!preset.value.roles.includes(myRole.value) && myRole.value !== '其他') {
+      alert(`「${myRole.value}」不在「${board.value}」板子的身份列表里，请重选身份`);
+      myRole.value = '';
+      step.value = 2;
+      return;
+    }
   }
   // 合成最终 playerStyles：档案库合成 + 手输
   const fromRoster = playerPickerRef.value?.formatBindings?.() || '';
@@ -418,5 +463,34 @@ function back() {
         开始对局
       </button>
     </div>
+
+    <!-- B1：选「其他」身份时弹出自定义身份输入框 -->
+    <Modal :show="showCustomRoleModal" @close="cancelCustomRole" max-width="max-w-sm">
+      <h3 class="font-serif text-lg font-bold text-parchment mb-2">自定义身份</h3>
+      <p class="text-sm text-parchment-200/70 mb-3">
+        输入你的身份名（如「混血儿」「吹笛者」「盗贼」），教练会按这个名字理解你的角色。
+      </p>
+      <input
+        ref="customRoleInputEl"
+        v-model="customRoleInput"
+        type="text"
+        maxlength="12"
+        class="w-full rounded-lg p-3 text-sm text-parchment focus:outline-none placeholder:text-parchment-200/30"
+        style="background: rgba(5,8,17,0.6); border: 1px solid rgba(212,175,55,0.22);"
+        placeholder="身份名（最多 12 字）"
+        @keydown.enter="confirmCustomRole"
+        @keydown.escape="cancelCustomRole"
+      />
+      <div class="flex gap-2 mt-3">
+        <button class="btn-ghost flex-1" @click="cancelCustomRole">取消</button>
+        <button
+          class="btn-primary flex-1"
+          :disabled="!customRoleInput.trim()"
+          @click="confirmCustomRole"
+        >
+          确定
+        </button>
+      </div>
+    </Modal>
   </div>
 </template>
