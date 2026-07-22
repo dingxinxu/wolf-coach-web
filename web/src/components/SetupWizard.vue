@@ -43,13 +43,13 @@ const isCustom = computed(() => board.value.startsWith('自定义：'));
 
 /**
  * P1-6：Step 2 可选身份列表。
- * - 标准板子：按 BOARDS[board].roles 过滤
+ * - 标准板子：按 BOARDS[board].roles 过滤，但保留「其他」卡片（B1：让标准板子用户也能选自定义身份）
  * - 自定义板子：显示全部 ROLES（用户自己负责）
  */
 const availableRoles = computed(() => {
   if (isCustom.value) return ROLES;
   if (!preset.value?.roles) return ROLES;
-  return ROLES.filter((r) => preset.value.roles.includes(r.label));
+  return ROLES.filter((r) => preset.value.roles.includes(r.label) || r.label === '其他');
 });
 
 /**
@@ -103,13 +103,18 @@ function pickBoard(b) {
   board.value = b;
   boardDesc.value = '';
   // B2：切板子时智能清理 stale 身份。
-  // 仅当 myRole 不在新板子的 roles 列表里才清空（同系列板子切换时保留预言家/女巫等兼容身份）。
+  // 仅当 myRole 不在新板子的 roles 列表里才考虑清空（同系列板子切换时保留预言家/女巫等兼容身份）。
   // 自定义板子不过滤身份，保留 myRole。
+  // B1：「其他」或用户填的自定义身份名（不在 ROLES 列表里）保留——切板子不应清空用户的自定义输入。
   if (myRole.value) {
     const newPreset = BOARDS[b];
     const newRoles = newPreset?.roles;
-    if (newRoles && !newRoles.includes(myRole.value) && myRole.value !== '其他') {
-      myRole.value = '';
+    if (newRoles && !newRoles.includes(myRole.value)) {
+      // 判断是否为自定义身份（不在 ROLES 预设列表，或就是「其他」占位符）
+      const isCustomRole = myRole.value === '其他' || !ROLES.some((r) => r.label === myRole.value);
+      if (!isCustomRole) {
+        myRole.value = '';
+      }
     }
   }
   step.value = 2;
@@ -162,10 +167,13 @@ function confirm() {
     alert('请描述自定义板子（人数、神民狼配置、特殊规则）');
     return;
   }
-  // B2：防御性兜底——标准板子下若 myRole 不在该板子的 roles 列表（也不应是"其他"），拒绝放行
+  // B2：防御性兜底——标准板子下若 myRole 不在该板子的 roles 列表且不是自定义身份（「其他」或用户填的自定义名），拒绝放行
   // 理论上 pickBoard 的智能清理已避免此情况，这里防极端路径（如回退后直接 confirm）
   if (!isCustom.value && preset.value?.roles) {
-    if (!preset.value.roles.includes(myRole.value) && myRole.value !== '其他') {
+    const isPresetRole = preset.value.roles.includes(myRole.value);
+    // B1：自定义身份（通过「其他」弹框填入的名字）允许放行——它不在 roles 列表但是合法用户输入
+    const isCustomRole = !ROLES.some((r) => r.label === myRole.value) || myRole.value === '其他';
+    if (!isPresetRole && !isCustomRole) {
       alert(`「${myRole.value}」不在「${board.value}」板子的身份列表里，请重选身份`);
       myRole.value = '';
       step.value = 2;
