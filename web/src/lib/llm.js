@@ -8,13 +8,16 @@
  * 错误处理：
  *   - 上游 SSE 错误事件（data: {"error":...}）抛出并携带 status/错误码
  *   - 网络中断抛错时标记 partial，调用方应显示"内容不完整"
- *   - 30s 无 chunk 视为超时（Worker 卡死/网络挂起）
+ *   - 首 token 前 90s 无响应视为超时（覆盖 reasoning 模型思考期）
+ *   - 首 token 后 30s 无新 chunk 视为流中断（上游卡死/网络挂起）
  */
 import { settings, buildLLMForRequest, workerBase, isLLMReady } from '../stores/settings.js';
 import { access } from '../stores/access.js';
 import { buildAuthHeaders } from './request.js';
 
-const STALL_TIMEOUT_MS = 30_000; // 30s 无新 chunk 视为超时
+// B4：双阈值——首 token 前用更长阈值（reasoning 模型思考期），首 token 后切短（流断检测）
+const FIRST_TOKEN_TIMEOUT_MS = 90_000; // 首 token 前 90s（覆盖 DeepSeek-R1 high / o-series 思考期）
+const STALL_TIMEOUT_MS = 30_000;       // 首 token 后 30s 无新 chunk 视为流断
 
 /**
  * HTTP 状态码 + 上游错误类型 -> 友好提示。
@@ -61,14 +64,16 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
 
   const headers = buildAuthHeaders(settings.keyMode, access.accessCode);
 
-  // 超时控制：30s 无新 chunk 触发 abort
+  // 超时控制：首 token 前用 90s（覆盖 reasoning 思考期），首 token 后切 30s（流断检测）
   const timeoutAbort = new AbortController();
   let stallTimer = null;
+  let firstChunkReceived = false; // B4：收到首个有效 chunk 后置 true，切换阈值
   const resetStall = () => {
     if (stallTimer) clearTimeout(stallTimer);
+    const ms = firstChunkReceived ? STALL_TIMEOUT_MS : FIRST_TOKEN_TIMEOUT_MS;
     stallTimer = setTimeout(() => {
       timeoutAbort.abort(new Error('stream_stall_timeout'));
-    }, STALL_TIMEOUT_MS);
+    }, ms);
   };
   // 用户外部取消信号
   if (signal) {
@@ -141,6 +146,11 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
           // OpenAI 兼容格式
           const delta = obj.choices?.[0]?.delta?.content || '';
           if (delta) {
+            // B4：首个有效 token 到达，切换到短阈值（30s stall 检测）
+            if (!firstChunkReceived) {
+              firstChunkReceived = true;
+              resetStall();
+            }
             full += delta;
             onChunk?.(delta, full);
           }
@@ -154,7 +164,11 @@ export async function chatWithCoach(messages, { onChunk, signal } = {}) {
 
     if (e.message === 'stream_stall_timeout') {
       // 超时不抛错，让调用方拿到 partial 内容 + partial=true
-      return { full, keySource, partial: true, error: '流式响应 30s 无新内容（超时）' };
+      // B4：根据是否收到过首 token 给不同提示
+      const msg = firstChunkReceived
+        ? '流式响应 30s 无新内容（超时）'
+        : '教练思考时间过长（90s 未开始输出），可能是复杂局面或模型繁忙，建议重试';
+      return { full, keySource, partial: true, error: msg };
     }
     if (e.name === 'AbortError') {
       // 用户取消：保留 partial 内容
