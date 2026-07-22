@@ -33,6 +33,16 @@ const MAX_INPUT_CHARS = 60000;
 const ADMIN_FAIL_LIMIT = 5;
 const ADMIN_LOCK_MS = 10 * 60 * 1000;
 
+/**
+ * C3：检查 messages 总长度是否超阈值（纯函数，供 handleChat 和测试共用）。
+ * @param {Array<{content?: string}>} messages
+ * @returns {{ tooLarge: boolean, length: number, limit: number }}
+ */
+export function checkInputSize(messages) {
+  const length = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+  return { tooLarge: length > MAX_INPUT_CHARS, length, limit: MAX_INPUT_CHARS };
+}
+
 // ========== KV 加密 / 访问码哈希 ==========
 
 /**
@@ -237,6 +247,28 @@ async function handleChat(request, env, ctx) {
     return cors(request, env, json({ error: 'messages required' }, 400));
   }
 
+  // WR-02：C3 input size 预检挪到访问码校验之前。
+  // 先加载 system prompt 算总长度，超阈值直接拒绝——避免超大请求白扣用户每日配额。
+  const skillBundle = await loadSkillBundle(env);
+  const systemPrompt = buildSystemPrompt(skillBundle);
+  const finalMessages = [{ role: 'system', content: systemPrompt }, ...userMessages];
+  const sizeCheck = checkInputSize(finalMessages);
+  if (sizeCheck.tooLarge) {
+    return cors(
+      request,
+      env,
+      json(
+        {
+          error: 'input_too_large',
+          detail: `输入过长（${sizeCheck.length} 字符 > ${sizeCheck.limit}）。请减少发言条数或开新局。`,
+          length: sizeCheck.length,
+          limit: sizeCheck.limit,
+        },
+        400
+      )
+    );
+  }
+
   // 用户没自带 apiKey 时，校验访问码（防共享池被白嫖）
   if (!body?.llm?.apiKey) {
     const guard = await requireAccessCode(request, env);
@@ -246,38 +278,13 @@ async function handleChat(request, env, ctx) {
   // 解析最终配置
   const cfg = await resolveLLMConfig(env, body);
   if (!cfg) {
-    return cors(request, env, 
+    return cors(request, env,
       json(
         {
           error: 'no_api_key',
           detail: '请在设置页填入自己的 API Key，或联系管理员配置共享 Key 池。',
         },
         401
-      )
-    );
-  }
-
-  // 注入技能文档作为 system prompt（首条）
-  const skillBundle = await loadSkillBundle(env);
-  const systemPrompt = buildSystemPrompt(skillBundle);
-  const finalMessages = [{ role: 'system', content: systemPrompt }, ...userMessages];
-
-  // C3：input size 预检（防超大 message 烧账单）
-  // system prompt ~32K 字符 + user 侧合计阈值 60K 字符（≈15K tokens user）
-  // 半公开场景下够用；超阈值直接拒绝，不进 LLM 调用
-  const totalLen = finalMessages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
-  if (totalLen > MAX_INPUT_CHARS) {
-    return cors(
-      request,
-      env,
-      json(
-        {
-          error: 'input_too_large',
-          detail: `输入过长（${totalLen} 字符 > ${MAX_INPUT_CHARS}）。请减少发言条数或开新局。`,
-          length: totalLen,
-          limit: MAX_INPUT_CHARS,
-        },
-        400
       )
     );
   }

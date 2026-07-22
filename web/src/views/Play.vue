@@ -67,11 +67,15 @@ function buildKnownFacts(pastRounds) {
   if (!pastRounds.length) return '';
   const lines = ['## 历史已知事实（前 ' + pastRounds.length + ' 轮）'];
 
-  // 累积死亡
+  // 累积死亡（跨轮去重，记录首次出局轮次）
+  const seenDead = new Set();
   const allDead = [];
   for (const round of pastRounds) {
     for (const seat of round.deaths) {
-      if (!allDead.includes(seat)) allDead.push([seat, round.round]);
+      if (!seenDead.has(seat)) {
+        seenDead.add(seat);
+        allDead.push([seat, round.round]);
+      }
     }
   }
   if (allDead.length) {

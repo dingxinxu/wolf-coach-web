@@ -17,6 +17,7 @@ import {
   resolveLLMConfig,
   requireAccessCode,
   requireAdmin,
+  checkInputSize,
 } from './index.js';
 
 // 常量 MAX_INPUT_CHARS / ADMIN_FAIL_LIMIT / ADMIN_LOCK_MS 不 export（避免 CF Workers
@@ -339,6 +340,47 @@ describe('E2 · requireAccessCode 全分支', () => {
     });
     const res = await requireAccessCode(mockRequest(baseCode), env);
     expect(res).toBeNull(); // 第 100 次，仍通过
+  });
+});
+
+// ========== C3: input size 预检（checkInputSize） ==========
+
+describe('C3 · checkInputSize', () => {
+  it('阈值 60000（通过 limit 字段间接断言常量值）', () => {
+    const r = checkInputSize([{ content: 'x' }]);
+    expect(r.limit).toBe(60000);
+  });
+
+  it('总长度 < 阈值 -> tooLarge=false', () => {
+    const r = checkInputSize([{ content: 'a'.repeat(59999) }]);
+    expect(r.tooLarge).toBe(false);
+    expect(r.length).toBe(59999);
+  });
+
+  it('总长度 = 阈值 -> tooLarge=false（边界：恰好不超）', () => {
+    const r = checkInputSize([{ content: 'a'.repeat(60000) }]);
+    expect(r.tooLarge).toBe(false);
+  });
+
+  it('总长度 > 阈值 -> tooLarge=true', () => {
+    const r = checkInputSize([{ content: 'a'.repeat(60001) }]);
+    expect(r.tooLarge).toBe(true);
+    expect(r.length).toBe(60001);
+  });
+
+  it('多 message 累加长度', () => {
+    const r = checkInputSize([
+      { content: '系统'.repeat(16000) }, // 32K
+      { content: '用户'.repeat(15000) }, // 30K
+    ]);
+    // 每个中文字符长度 1，合计 62K > 60K
+    expect(r.length).toBe(62000);
+    expect(r.tooLarge).toBe(true);
+  });
+
+  it('content 为 undefined/空 -> 不计入长度', () => {
+    const r = checkInputSize([{ role: 'system' }, { content: '' }, { content: 'abc' }]);
+    expect(r.length).toBe(3);
   });
 });
 

@@ -218,7 +218,6 @@ export function resetGame({ keepSetup = false } = {}) {
   if (keepSetup && game.setup.board) {
     // 保留 setup + seatBindings，仅清轮次、重建 players 存活态
     const setup = game.setup;
-    const seatBindings = game.seatBindings;
     const isCustom = typeof setup.board === 'string' && setup.board.startsWith('自定义：');
     let total;
     if (isCustom) {
