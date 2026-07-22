@@ -12,10 +12,14 @@
 
 ### 对局体验
 - **极简卡片选择**：板子、身份、座位、票型全部点击选择，几乎不用打字。
-- **🎴 网易官方立绘卡牌**：板子/身份选项卡使用《狼人杀》官方角色立绘，按阵营配色（神职金/平民钢蓝/狼人血月红）。
+- **🎴 网易官方立绘卡牌**：板子/身份选项卡使用《狼人杀》官方角色立绘（webp 优化版，~50KB/张），按阵营配色（神职金/平民钢蓝/狼人血月红）。
+- **🎴 6 板子预设 + 自定义板子**：9 预女猎 / 12 预女猎守 / 12 预女猎白 / 12 狼王 / 12 白狼王 / 9 狼王，外加「自定义板子」入口（textarea 描述狼美人/守墓人/丘比特等罕见板）。
+- **🛡 身份自洽过滤**：选完板子后，身份卡按该板子的 `roles` 数组过滤，防止矛盾组合（如 9 预女猎板不显示狼王）。
 - **🔴 夜晚 / 🟣 上警 / 🟡 发言 / 🔴 票型**：第 1 轮自动显示上警环节（上警玩家、退水、警上发言、当选警长、警徽流），与"无警长"规则联动。
+- **⚙️ setup 可编辑**：仅第 1 轮且当前轮无 analysis 时允许改身份/座位（`canEditSetup()` 守卫）。改板子请用「重开」。
 - **🎙 录音 + 暂停/继续**：每个玩家发言一段录音，Groq Whisper large-v3 自动转写；录音中可暂停思考再继续，有效时长不含暂停段，120s 上限按净录音计算。
-- **🧠 教练级分析**：注入 wolf-game-coach 全套规则+策略文档作为 system prompt，LLM 按 6 段格式输出（追问/态势/发言/决策/风险/下轮），并追加【玩家情绪】表格。
+- **🧠 教练级分析**：注入 wolf-game-coach 全套规则+策略文档作为 system prompt，LLM 按 6 段格式输出（追问/态势/发言/决策/风险/下轮），并追加【玩家情绪】表格。实测 **prompt cache 命中率 99.84%**（DeepSeek，system prompt ~32K tokens）。
+- **🛡 SSE 健壮性**：上游错误事件捕获 + HTTP 状态码映射（401/403/429/502 友好提示）+ 流式中断 partial 标记 + 30s stall 超时 + 用户取消支持。
 - **👥 玩家档案库**：跨局保存熟人玩家头像 + 风格标签（悍跳狼/倒钩狼/新手等），开新局一键关联座位。
 
 ### 视觉风格
@@ -27,8 +31,14 @@
 ### 工程
 - **OpenAI 兼容**：默认 DeepSeek（国内原生访问），可改 Claude / OpenAI / Groq 等。
 - **双 Key 模式**：用你自己的 API Key（游客模式），或用管理员维护的共享池（持访问码解锁）。
-- **🔐 访问码系统**：管理员批量生成、可撤销；持码用户才能用共享池；AES-GCM 加密存储 apiKey。
-- **离线持久化**：每局进度 + 玩家档案库 自动存 localStorage，一键导出/导入 JSON。
+- **🔐 访问码系统**：管理员批量生成（可设「每日用量上限」+「有效期天数」）、可撤销；持码用户才能用共享池；AES-GCM 加密存储 apiKey。访问码前端 sessionStorage + 7 天 TTL，Worker 端 KV 校验过期/用量。
+- **🌐 CORS 白名单**：Worker `cors(request, env, res)` 中间件按 `ALLOWED_ORIGINS` 白名单放行，非白名单 origin 被拒（防 admin 密码被跨站爆破）。
+- **🚦 KV 限流**：每访问码每日用量计数，超出 `dailyLimit`（默认 100）返回 429，防账单被滥用刷爆。
+- **📝 marked + DOMPurify**：教练分析 markdown 渲染用 `marked` + `DOMPurify`（XSS 防护），替代了早期自写正则。
+- **⚡ prompt cache 优化**：`buildSystemPrompt` 输出固定字符串（无时间戳/随机），实测 DeepSeek prompt cache 命中率 99.84%，每次调用省 ~90% input token 成本。
+- **📦 PWA 离线缓存**：`vite-plugin-pwa` 预缓存 App Shell + 9 webp + 4 skill md；离线可查术语/FAQ/历史对局（LLM/STT 接口不缓存）。
+- **✅ Vitest 单测**：46 用例覆盖 markdown 渲染 baseline + game store 常量/导入校验/自定义板子/canEditSetup + worker store localStorage 迁移。
+- **离线持久化**：每局进度 + 玩家档案库 自动存 localStorage，一键导出/导入 JSON（导入含白名单字段过滤防原型链污染）。
 - **术语/FAQ 内置**：直接读技能 md，零 token 消耗。
 
 ## 🏗 架构
@@ -43,19 +53,21 @@ wolf-coach-web/                # 本仓库（monorepo）
 │   ├── src/
 │   │   ├── views/             # Play / Settings / Admin（配置 + 访问码管理）
 │   │   ├── components/        # SetupWizard / SeatGrid / RoundInput（含上警卡）/ AnalysisPanel / TermFaq / VoiceRecorder（含暂停）/ PlayerPicker / AccessBanner
-│   │   ├── stores/            # settings / game / players-roster / access（访问码+admin key）
-│   │   └── lib/               # llm / md / stt（含 pause/resume Recorder）
+│   │   ├── stores/            # worker / settings / game / players-roster / access（访问码+admin key）
+│   │   ├── lib/               # llm（含 SSE 错误处理）/ md（marked+DOMPurify）/ stt（含 pause/resume Recorder）
+│   │   └── lib/*.test.js      # Vitest 单测（46 用例）
 │   └── public/
 │       ├── skill/             # ← 由 scripts/sync-skill.js 同步过来
-│       └── role-art/          # 9 张网易官方角色立绘（PNG）
+│       └── role-art/          # 9 张网易官方角色立绘：原 PNG（版权证据）+ webp（实际使用，~50KB/张）
 ├── worker/                    # Cloudflare Worker 后端代理
-│   ├── src/index.js           # 主入口（路由 + OpenAI 兼容转发 + Whisper 透传 + admin 自鉴权 + 访问码 + AES-GCM）
-│   ├── src/skill-loader.js    # 加载技能 md 并组装 system prompt
+│   ├── src/index.js           # 主入口（路由 + OpenAI 兼容转发 + Whisper 透传 + admin 自鉴权 + 访问码 + AES-GCM + CORS 白名单 + KV 限流）
+│   ├── src/skill-loader.js    # 加载技能 md 并组装 system prompt（固定输出以命中 prompt cache）
 │   ├── skill/                 # ← 由 sync-skill.js 同步过来
 │   └── skill-bundle.js        # ← 由 inline-skill.js 生成（md → JS 模块）
 ├── scripts/
 │   ├── sync-skill.js          # 从 skill-source/ 同步到 web/worker
-│   └── inline-skill.js        # 把 md 打包成 worker 可 import 的 JS
+│   ├── inline-skill.js        # 把 md 打包成 worker 可 import 的 JS
+│   └── convert-art.js         # 一次性脚本：role-art/*.png → webp（原 PNG 保留作版权证据）
 └── .github/workflows/deploy.yml
 ```
 
@@ -69,8 +81,10 @@ wolf-coach-web/                # 本仓库（monorepo）
 └─────────────┘    SSE 流式                    │  - 访问码校验 │
                                                 │  - admin 鉴权 │
 ┌─────────────┐   /admin/api/* (X-Admin-Key)  │  - KV 加密    │
-│  /admin 页  │ ─────────────────────────────▶│              │
-└─────────────┘   配置/访问码 CRUD              └──────────────┘
+│  /admin 页  │ ─────────────────────────────▶│  - CORS 白名单│
+└─────────────┘   配置/访问码 CRUD              │  - KV 限流    │
+                                                │  - TTL 过期   │
+                                                └──────────────┘
 ```
 
 ### 关键路由
@@ -161,7 +175,7 @@ pnpm dev:web       # 监听 http://localhost:5173，自动代理 /api /admin -> 
 Worker 部署后，访问 `https://<worker>.workers.dev/` 应返回 `{"ok":true}`。然后：
 
 1. 打开 `https://<user>.github.io/<repo>/#/admin`，用 `ADMIN_PASSWORD` 登录。
-2. 在 LLM 配置填 baseUrl（如 `https://api.deepseek.com`）/ model / apiKey。
+2. 在 LLM 配置填 baseUrl（如 `https://api.deepseek.com/v1`）/ model / apiKey。
 3. 在 STT 配置填 baseUrl（`https://api.groq.com/openai/v1`）/ model（`whisper-large-v3`）/ apiKey。
 4. 在访问码管理批量生成几个码，分发给用户。
 5. 用户在前端顶部【🔒 访问码】栏输入码 → 解锁共享池 → 在【设置】选「管理员共享池」即可用。
@@ -172,7 +186,8 @@ Worker 部署后，访问 `https://<worker>.workers.dev/` 应返回 `{"ok":true}
 |---|---|---|
 | 用户自带 LLM/STT Key | 浏览器 localStorage | 每次请求透传给 Worker，Worker 不存储，转发后丢弃 |
 | 管理员共享池 apiKey | Worker KV（**AES-GCM 加密**） | 明文用 `KV_ENC_KEY` 加密后入库，GET 时解密展示、PUT 时加密入库 |
-| 访问码 | Worker KV（**SHA-256 哈希**） | 仅存 `code:<hash>`，明文只在生成时返回一次 |
+| 访问码 | Worker KV（**SHA-256 哈希**） | 仅存 `code:<hash>`，明文只在生成时返回一次；含 `usage`（每日计数）、`dailyLimit`、`expiresAt` 字段 |
+| 访问码（前端缓存） | sessionStorage + localStorage（7 天 TTL） | session 级副本 + 7 天 TTL 长期副本；老明文永久 key 已被一次性清理 |
 | ADMIN_PASSWORD | Worker secret | `X-Admin-Key` 头比对，不走 CF Access（避免跨域 cookie 问题） |
 | 对局数据 | 完全本地 localStorage | 永不上传 |
 | 录音数据 | 转写期间传 Groq Whisper | Worker 不存盘，转写完即丢弃 |
@@ -204,31 +219,41 @@ Worker 部署后，访问 `https://<worker>.workers.dev/` 应返回 `{"ok":true}
 
 **工程：**
 - ✅ 多 LLM 配置 + 双 Key 模式（自带 / 共享池）
-- ✅ 🔐 访问码系统（生成 / 验证 / 撤销）
+- ✅ 🔐 访问码系统（生成 / 验证 / 撤销 / 每日上限 / 有效期）
 - ✅ Worker admin 自鉴权 + KV AES-GCM 加密
 - ✅ CI 自动部署前端到 GitHub Pages（Worker 部署可选启用）
-- ✅ 🎴 网易官方角色立绘 + 血月主题 UI
+- ✅ 🎴 网易官方角色立绘 + 血月主题 UI（webp 优化版）
+- ✅ 🌐 CORS 白名单 + 🚦 KV 限流 + 🔐 访问码 TTL（sessionStorage + 7 天）
+- ✅ 📝 marked + DOMPurify markdown 渲染（XSS 防护）
+- ✅ ⚡ prompt cache 稳定性优化（实测命中率 99.84%）
+- ✅ 📦 PWA 离线缓存（App Shell + 立绘 + skill md）
+- ✅ ✅ Vitest 46 用例单测（md/game/worker store）
+- ✅ 🛡 SSE 错误处理（错误码映射 + partial 标记 + 30s 超时）
+- ✅ 🛡 导入 JSON 白名单字段过滤（防原型链污染）
+- ✅ 6 板子预设 + 自定义板子 + 身份自洽过滤
+- ✅ setup 可编辑（第 1 轮无 analysis 时）
+- ✅ 破坏性操作 confirm 守卫（重开/结束/下一轮条件触发）
 
 ### 后续候选方向
 
 - 实测线下对局体验，根据反馈调整卡片密度与交互节奏
 - 「快速重开」（保留玩家档案库 + 板子配置，仅清空当前局）
 - 玩家档案库加「上次对局」时间戳，方便识别生疏熟人
-- 把 9 张网易立绘压成 webp（约 30KB/张），首屏流量从 1.8MB 降到 ~300KB
-- 把访问码系统扩展为带有效期的临时码（目前为永久码）
+- 共享池预算熔断（admin 设 $/day 上限，耗尽自动停）
+- 长对话的滚动窗口/压缩策略（避免 context_length_exceeded）
 
 ## 🧭 项目状态
 
-- **当前阶段**：MVP 完整可用 + UI 视觉打磨 + 双 Key 安全机制
+- **当前阶段**：MVP 完整可用 + UI 视觉打磨 + 双 Key 安全机制 + 19 项工程改进（CORS 白名单 / KV 限流 / 访问码 TTL / SSE 健壮性 / marked+DOMPurify / prompt cache 优化 / 立绘 webp / 扩板子 / PWA / Vitest）
 - **线上访问**：<https://dingxinxu.github.io/wolf-coach-web/>
-- **Worker 部署**：手动部署已就绪；CI 自动部署需同时配 `ENABLE_WORKER_DEPLOY=true` 变量 + `CF_API_TOKEN`/`CF_ACCOUNT_ID` Secret
+- **Worker 部署**：CI 自动部署已启用（`ENABLE_WORKER_DEPLOY=true` + `CF_API_TOKEN`/`CF_ACCOUNT_ID`），push main 自动跑 `wrangler deploy`
 - **最新 commits**：
-  - `fix(code-review): 修复 5 项 code-review 发现`
-  - `feat: 板子/身份卡换用网易官方角色立绘`
-  - `ui: 视觉全面优化，参考网易狼人杀官方风格`
-  - `feat: 录音暂停/继续 + 第1轮上警环节录入`
-  - `feat: 访问码系统 + Worker admin 鉴权 + KV 加密`
-  - `ci: 修复 pnpm 版本冲突并启用 GitHub Pages 部署`
+  - `docs: README 全面同步 19 项改进`
+  - `docs: 忽略 .zcode/ + 更新 AGENTS.md`
+  - `chore(p2): 移除 admin 入口 + 同步 README + PWA + component class + setup 可编辑`
+  - `feat(p1): marked+DOMPurify + 立绘 webp + 扩板子 + confirm + NPE 防御`
+  - `fix(p0): CORS 白名单 + KV 限流 + 访问码 TTL + SSE 错误处理`
+  - `refactor(infra): 抽 worker.js 模块 + 引入 Vitest baseline`
 
 ## 🤝 贡献
 
